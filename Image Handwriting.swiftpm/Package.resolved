@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "BezierKit",
+        "repositoryURL": "https://github.com/hfutrell/BezierKit.git",
+        "state": {
+          "branch": null,
+          "revision": "a755d0843e85726d650f63521e90a5e9cb699a36",
+          "version": "0.14.0"
+        }
+      }
+    ]
+  },
+  "version": 1
+}
