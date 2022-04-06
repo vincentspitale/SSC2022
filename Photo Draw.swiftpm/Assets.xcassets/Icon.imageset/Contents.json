@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "PhotoDraw.png",
+      "filename" : "PhotoDraw.png 16-26-41-102.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
@@ -12,7 +12,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "PhotoDrawDark.png",
+      "filename" : "PhotoDraw.png",
       "idiom" : "universal",
       "scale" : "1x"
     },

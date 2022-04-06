@@ -1,11 +1,13 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State var isContinued: Bool = false
+    @State var isShowingWelcome: Bool = true
     var body: some View {
         ZStack{
-            WelcomeView(isContinued: $isContinued)
-            if isContinued {
+            if isShowingWelcome {
+            WelcomeView(isContinued: $isShowingWelcome)
+            }
+            if !isShowingWelcome {
                 Rectangle()
                     .foregroundColor(Color(uiColor: UIColor.systemBackground))
                     .transition(.opacity)

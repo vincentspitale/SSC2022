@@ -27,6 +27,7 @@ struct WelcomeView: View {
                     RoundedRectangle(cornerRadius: 40,
                                                              style: .continuous)
                 }
+                .accessibilityLabel(Text("App Icon"))
                 .padding()
                 .padding(.vertical, 40)
             
@@ -34,7 +35,7 @@ struct WelcomeView: View {
                 Text("Photo Draw").font(.largeTitle)
                     .bold()
                     .padding(.bottom)
-            Text("Photo Draw lets you convert images with handwriting to vector paths. These paths can then be manipulated exactly like they were drawn directly on your device. For the best editing experience consider using an Apple Pencil.")
+            Text("Photo Draw lets you convert images with handwriting or line drawings to vector paths. These paths can then be manipulated exactly like they were drawn directly on your device. For the best editing experience consider using an Apple Pencil.")
             }
             .lineSpacing(10)
             .frame(maxWidth: 600)
@@ -47,7 +48,7 @@ struct WelcomeView: View {
                 Spacer()
                 Button(action: {
                     withAnimation{$isContinued.wrappedValue.toggle()}}) {
-                Text("Continue")
+                Text("Let's Draw!")
                     .font(.headline)
                     .bold()
                     .foregroundColor(Color(uiColor: UIColor.systemBackground))
