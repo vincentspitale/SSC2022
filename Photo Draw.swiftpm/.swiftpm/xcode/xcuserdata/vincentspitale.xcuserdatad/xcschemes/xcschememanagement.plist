@@ -4,7 +4,7 @@
 <dict>
 	<key>SchemeUserState</key>
 	<dict>
-		<key>Image Handwriting.xcscheme_^#shared#^_</key>
+		<key>Photo Draw.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>0</integer>
@@ -17,7 +17,7 @@
 			<key>primary</key>
 			<true/>
 		</dict>
-		<key>Image Handwriting</key>
+		<key>Photo Draw</key>
 		<dict>
 			<key>primary</key>
 			<true/>

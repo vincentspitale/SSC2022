@@ -8,15 +8,15 @@ import PackageDescription
 import AppleProductTypes
 
 let package = Package(
-    name: "Image Handwriting",
+    name: "Photo Draw",
     platforms: [
         .iOS("15.2")
     ],
     products: [
         .iOSApplication(
-            name: "Image Handwriting",
+            name: "Photo Draw",
             targets: ["AppModule"],
-            bundleIdentifier: "vincentspitale.Image-Handwriting",
+            bundleIdentifier: "vincentspitale.Photo-Draw",
             teamIdentifier: "R4NGB6G36L",
             displayVersion: "1.0",
             bundleVersion: "1",
