@@ -28,6 +28,7 @@ enum CanvasTool: Equatable {
     case pen
     case selection
     case touch
+    case eraser
 }
 
 

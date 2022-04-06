@@ -24,41 +24,7 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: .greatestFiniteMagnitude, style: .continuous)
                         .foregroundColor(Color(uiColor: UIColor.systemGray5))
                             HStack {
-                                Spacer()
-                                Button(action: {windowState.currentTool = .touch}) {
-                                Image(systemName: "hand.point.up")
-                                    .font(.largeTitle)
-                                    .foregroundColor(windowState.currentTool == .touch ? .primary : .secondary)
-                                    .frame(width: 50)
-                                }
-                                Spacer()
-                                Button(action: {windowState.currentTool = .pen}) {
-                                    ZStack {
-                                        Image(systemName: "pencil.tip")
-                                            .font(.largeTitle)
-                                            .foregroundColor(windowState.currentTool == .pen ? .primary : .secondary)
-                                        Image(systemName: "pencil.tip")
-                                            .font(.largeTitle)
-                                            .foregroundColor(Color(uiColor: windowState.currentColor.color))
-                                            .mask(VStack{
-                                                Rectangle()
-                                                    .foregroundColor(.white)
-                                                    .frame(height: 15)
-                                                Spacer()
-                                            })
-                                            .opacity(windowState.currentTool == .pen ? 100 : 0)
-                                    }
-                                    .frame(width: 50)
-                                }
-                                Spacer()
-                                Button(action: {}) {
-                                Image(systemName: "photo")
-                                    .font(.largeTitle)
-                                    .foregroundColor(.accentColor)
-                                
-                                    .frame(width: 50)
-                                }
-                                Spacer()
+                                self.controls()
                                 Button(action: {windowState.currentTool = .selection}) {
                                     Image(systemName: "lasso")
                                         .font(.largeTitle)
@@ -76,8 +42,61 @@ struct ContentView: View {
                         Spacer()
                         }
                     }
+                    
+                
                 }
             }
         }
+    }
+    
+    @ViewBuilder func controls() -> some View {
+        Spacer()
+        Button(action: {windowState.currentTool = .touch}) {
+        Image(systemName: "hand.point.up")
+            .font(.largeTitle)
+            .foregroundColor(windowState.currentTool == .touch ? .primary : .secondary)
+            .frame(width: 50)
+        }
+        Spacer()
+        Button(action: {windowState.currentTool = .pen}) {
+            ZStack {
+                Image(systemName: "pencil.tip")
+                    .font(.largeTitle)
+                    .foregroundColor(windowState.currentTool == .pen ? .primary : .secondary)
+                Image(systemName: "pencil.tip")
+                    .font(.largeTitle)
+                    .foregroundColor(Color(uiColor: windowState.currentColor.color))
+                    .mask(VStack{
+                        Rectangle()
+                            .foregroundColor(.white)
+                            .frame(height: 15)
+                        Spacer()
+                    })
+                    .opacity(windowState.currentTool == .pen ? 100 : 0)
+            }
+            .frame(width: 50)
+        }
+        Spacer()
+        Button(action: {}) {
+        Image(systemName: "photo")
+            .font(.largeTitle)
+            .foregroundColor(.accentColor)
+        
+            .frame(width: 50)
+        }
+        Spacer()
+        Button(action: {windowState.currentTool = .eraser}) {
+            ZStack{
+            Image(systemName: "scribble")
+                .font(.largeTitle)
+                .foregroundColor(windowState.currentTool == .eraser ? .primary : .secondary)
+            Image(systemName: "line.diagonal")
+                .font(.largeTitle)
+                .foregroundColor(windowState.currentTool == .eraser ? Color.red : .secondary)
+                
+            }
+            .frame(width: 50)
+        }
+        Spacer()
     }
 }
