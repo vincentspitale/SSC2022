@@ -31,9 +31,9 @@ struct DrawView: View {
                 if horizontalSizeClass == .compact {
                     Spacer()
                     
-                        self.colorPicker()
-                        
-                            .padding()
+                    self.colorPicker()
+                    
+                        .padding()
                 }
                 ZStack {
                     RoundedRectangle(cornerRadius: .greatestFiniteMagnitude, style: .continuous)
@@ -50,18 +50,15 @@ struct DrawView: View {
                             
                                 .frame(width: 50)
                         }
+                        .accessibilityLabel("Select")
                         Spacer()
                     }
                 }
-                
                 .frame(minWidth: nil, idealWidth: 400, maxWidth: 400, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
                 .padding(.horizontal)
                 if horizontalSizeClass != .compact {
-                    
-                        self.colorPicker()
-                        
-                            .padding()
-                    
+                    self.colorPicker()
+                        .padding()
                     Spacer()
                 }
             }
@@ -77,6 +74,7 @@ struct DrawView: View {
                 .foregroundColor(windowState.currentTool == .touch ? .primary : .secondary)
                 .frame(width: 50)
         }
+        .accessibilityLabel("Touch")
         Spacer()
         Button(action: {penAction()}) {
             ZStack {
@@ -96,6 +94,7 @@ struct DrawView: View {
             }
             .frame(width: 50)
         }
+        .accessibilityLabel("Pen")
         Spacer()
         Button(action: {}) {
             Image(systemName: "photo")
@@ -104,6 +103,7 @@ struct DrawView: View {
             
                 .frame(width: 50)
         }
+        .accessibilityLabel("Add Photo")
         Spacer()
         Button(action: {windowState.currentTool = .eraser}) {
             ZStack{
@@ -117,33 +117,34 @@ struct DrawView: View {
             }
             .frame(width: 50)
         }
+        .accessibilityLabel("Eraser")
         Spacer()
     }
     
     @ViewBuilder func colorPicker() -> some View {
         
         if self.windowState.isShowingColorPicker {
-        LazyVGrid(columns: columns, spacing: 15) {
-            ForEach(SemanticColor.allCases, id: \.self) { color in
-                Button(action: { self.windowState.currentColor = color }) {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .foregroundColor(Color(uiColor: color.color))
-                        .frame(width: 30, height: 30)
-                        .overlay{
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .stroke(Color.accentColor, lineWidth: self.windowState.currentColor == color ? 3 : 0)
-                        }
+            LazyVGrid(columns: columns, spacing: 15) {
+                ForEach(SemanticColor.allCases, id: \.self) { color in
+                    Button(action: { self.windowState.currentColor = color }) {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .foregroundColor(Color(uiColor: color.color))
+                            .frame(width: 30, height: 30)
+                            .overlay{
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .stroke(Color.accentColor, lineWidth: self.windowState.currentColor == color ? 3 : 0)
+                            }
+                    }
+                    .accessibilityLabel(Text(color.name(isDark: colorScheme == .dark)))
                 }
-                .accessibilityLabel(Text(color.name(isDark: colorScheme == .dark)))
             }
-        }
-        .padding()
-        .background{
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .foregroundColor(Color(uiColor: .systemGray5))
-        }
-        .frame(minWidth: nil, idealWidth: 200, maxWidth: 200, alignment: .center)
-        .transition(.scale.combined(with: .opacity).combined(with: .move(edge: self.horizontalSizeClass == .compact ? .bottom : .top)))
+            .padding()
+            .background{
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .foregroundColor(Color(uiColor: .systemGray5))
+            }
+            .frame(minWidth: nil, idealWidth: 200, maxWidth: 200, alignment: .center)
+            .transition(.scale.combined(with: .opacity).combined(with: .move(edge: self.horizontalSizeClass == .compact ? .bottom : .top)))
         }
     }
     
