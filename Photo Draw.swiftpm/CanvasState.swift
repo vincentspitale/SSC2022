@@ -9,6 +9,7 @@ import Foundation
 import Combine
 import BezierKit
 import UIKit
+import SwiftUI
 
 
 class CanvasState: ObservableObject {
@@ -19,9 +20,18 @@ class CanvasState: ObservableObject {
             if newValue != CanvasTool.selection {
                 selection = nil
             }
+            if newValue != CanvasTool.pen {
+                withAnimation{ self.isShowingColorPicker = false }
+            }
         }
     }
     @Published var selection: CGRect? = nil
+    @Published var isShowingColorPicker: Bool = false
+    
+    var selectedPaths: [Path] {
+        #warning("Implement")
+        return []
+    }
 }
 
 enum CanvasTool: Equatable {
@@ -44,8 +54,9 @@ class Path {
     }
 }
 
-enum SemanticColor {
+enum SemanticColor: CaseIterable {
     case primary
+    case gray
     case red
     case orange
     case yellow
@@ -57,6 +68,8 @@ enum SemanticColor {
         switch self {
         case .primary:
             return UIColor.label
+        case .gray:
+            return UIColor.systemGray
         case .red:
             return UIColor.systemRed
         case .orange:
@@ -69,6 +82,27 @@ enum SemanticColor {
             return UIColor.systemBlue
         case .purple:
             return UIColor.systemPurple
+        }
+    }
+    
+    public func name(isDark: Bool) -> String {
+        switch self {
+        case .primary:
+            return isDark ? "White" : "Black"
+        case .gray:
+            return "Gray"
+        case .red:
+            return "Red"
+        case .orange:
+            return "Orange"
+        case .yellow:
+            return "Yellow"
+        case .green:
+            return "Green"
+        case .blue:
+            return "Blue"
+        case .purple:
+            return "Purple"
         }
     }
     
