@@ -10,6 +10,7 @@ import Combine
 import BezierKit
 import UIKit
 import SwiftUI
+import simd
 
 
 class CanvasState: ObservableObject {
@@ -25,12 +26,11 @@ class CanvasState: ObservableObject {
             }
         }
     }
-    @Published var selection: CGRect? = nil
+    @Published var selection: [Path]? = nil
     @Published var isShowingColorPicker: Bool = false
     
     var selectedPaths: [Path] {
-        #warning("Implement")
-        return []
+        return selection ?? []
     }
 }
 
@@ -38,7 +38,7 @@ enum CanvasTool: Equatable {
     case pen
     case selection
     case touch
-    case eraser
+    case remove
 }
 
 
@@ -46,11 +46,17 @@ class Path {
     var curve: BezierCurve
     var color: SemanticColor
     var drawMode: DrawMode
+    var transform: simd_float3x3
     
     init(curve: BezierCurve, color: UIColor, drawMode: DrawMode = .solid) {
         self.curve = curve
         self.color = SemanticColor.colorToSemanticColor(color: color)
         self.drawMode = drawMode
+        self.transform = matrix_identity_float3x3
+    }
+    
+    func resize(transform: simd_float3x3) {
+        self.transform *= transform
     }
 }
 

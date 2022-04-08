@@ -35,9 +35,9 @@ struct WelcomeView: View {
                 Text("Photo Draw").font(.largeTitle)
                     .bold()
                     .padding(.bottom)
-            Text("Ever wished you could move your writing on paper like you can with digital ink?\n")
+            Text("Ever wished you could move and edit your writing on paper like you can with digital ink?\n")
                 
-            Text("Photo Draw lets you convert images with handwriting or line drawings to vector paths. These paths can then be manipulated exactly like they were drawn directly on your device. Perfect for those who prefer the tactile feel of paper!\n")
+            Text("Photo Draw lets you convert images with handwriting or line drawings to vector paths. These paths can then be manipulated exactly like they were drawn directly on your device. Perfect for those who prefer the tactile feel of paper or students who want to digitize what's on the board!\n")
                 Text("For the best editing experience consider using an Apple Pencil.")
                     .foregroundColor(.secondary)
             }

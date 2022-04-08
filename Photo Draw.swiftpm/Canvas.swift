@@ -9,5 +9,17 @@ import Foundation
 import UIKit
 
 class Canvas: UIViewController {
+    var state: CanvasState
+    
+    init(state: CanvasState) {
+        self.state = state
+        super.init(nibName: nil, bundle: nil)
+    }
+    
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
     
 }

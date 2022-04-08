@@ -30,9 +30,7 @@ struct DrawView: View {
             VStack{
                 if horizontalSizeClass == .compact {
                     Spacer()
-                    
                     self.colorPicker()
-                    
                         .padding()
                 }
                 ZStack {
@@ -51,6 +49,7 @@ struct DrawView: View {
                                 .frame(width: 50)
                         }
                         .accessibilityLabel("Select")
+                        .accessibility(addTraits: self.windowState.currentTool == .selection ? .isSelected : [])
                         Spacer()
                     }
                 }
@@ -75,6 +74,7 @@ struct DrawView: View {
                 .frame(width: 50)
         }
         .accessibilityLabel("Touch")
+        .accessibility(addTraits: self.windowState.currentTool == .touch ? .isSelected : [])
         Spacer()
         Button(action: {penAction()}) {
             ZStack {
@@ -95,6 +95,8 @@ struct DrawView: View {
             .frame(width: 50)
         }
         .accessibilityLabel("Pen")
+        .accessibilityValue(Text(windowState.currentColor.name(isDark: colorScheme == .dark)))
+        .accessibility(addTraits: self.windowState.currentTool == .pen ? .isSelected : [])
         Spacer()
         Button(action: {}) {
             Image(systemName: "photo")
@@ -105,19 +107,20 @@ struct DrawView: View {
         }
         .accessibilityLabel("Add Photo")
         Spacer()
-        Button(action: {windowState.currentTool = .eraser}) {
+        Button(action: {windowState.currentTool = .remove}) {
             ZStack{
                 Image(systemName: "scribble")
                     .font(.largeTitle)
-                    .foregroundColor(windowState.currentTool == .eraser ? .primary : .secondary)
+                    .foregroundColor(windowState.currentTool == .remove ? .primary : .secondary)
                 Image(systemName: "line.diagonal")
                     .font(.largeTitle)
-                    .foregroundColor(windowState.currentTool == .eraser ? Color.red : Color(uiColor: UIColor.systemGray3))
+                    .foregroundColor(windowState.currentTool == .remove ? Color.red : Color(uiColor: UIColor.systemGray3))
                 
             }
             .frame(width: 50)
         }
-        .accessibilityLabel("Eraser")
+        .accessibilityLabel("Remove")
+        .accessibility(addTraits: self.windowState.currentTool == .remove ? .isSelected : [])
         Spacer()
     }
     
@@ -126,7 +129,7 @@ struct DrawView: View {
         if self.windowState.isShowingColorPicker {
             LazyVGrid(columns: columns, spacing: 15) {
                 ForEach(SemanticColor.allCases, id: \.self) { color in
-                    Button(action: { self.windowState.currentColor = color }) {
+                    Button(action: { self.windowState.currentColor = color  }) {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .foregroundColor(Color(uiColor: color.color))
                             .frame(width: 30, height: 30)
@@ -136,6 +139,7 @@ struct DrawView: View {
                             }
                     }
                     .accessibilityLabel(Text(color.name(isDark: colorScheme == .dark)))
+                    .accessibility(addTraits: self.windowState.currentColor == color ? .isSelected : [])
                 }
             }
             .padding()
