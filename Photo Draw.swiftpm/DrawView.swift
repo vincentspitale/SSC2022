@@ -17,6 +17,12 @@ struct DrawView: View {
         GridItem(.adaptive(minimum: 30))
     ]
     
+    var selectionColorIndices: [(Int, SemanticColor)] {
+        let colors = Array(windowState.selectionColors).enumerated().filter { index, color in
+            index < 3
+        }.map{ $0.1 }.sorted()
+        return Array(zip(colors.indices, colors))
+    }
     
     var body: some View {
         ZStack{
@@ -25,12 +31,17 @@ struct DrawView: View {
                 .transition(.opacity)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    withAnimation{ self.windowState.isShowingColorPicker = false }
+                    withAnimation{ self.windowState.isShowingPenColorPicker = false }
+                    withAnimation{ windowState.selection = nil }
                 }
             VStack{
                 if horizontalSizeClass == .compact {
                     Spacer()
-                    self.colorPicker()
+                    self.penColorPicker()
+                        .zIndex(0)
+                        .padding()
+                    self.selectionColorPicker()
+                        .zIndex(0)
                         .padding()
                 }
                 ZStack {
@@ -41,7 +52,7 @@ struct DrawView: View {
                         if windowState.selection == nil {
                             self.controls()
                         }
-                        Button(action: {windowState.currentTool = .selection}) {
+                        Button(action: {selectionAction()}) {
                             Image(systemName: "lasso")
                                 .font(.largeTitle)
                                 .foregroundColor(windowState.currentTool == .selection ? .primary : .secondary)
@@ -50,13 +61,22 @@ struct DrawView: View {
                         }
                         .accessibilityLabel("Select")
                         .accessibility(addTraits: self.windowState.currentTool == .selection ? .isSelected : [])
+                        if windowState.selection != nil {
+                            Spacer()
+                            self.selectionControls()
+                        }
                         Spacer()
                     }
                 }
                 .frame(minWidth: nil, idealWidth: 400, maxWidth: 400, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
+                .zIndex(1)
                 .padding(.horizontal)
                 if horizontalSizeClass != .compact {
-                    self.colorPicker()
+                    self.penColorPicker()
+                        .zIndex(0)
+                        .padding()
+                    self.selectionColorPicker()
+                        .zIndex(0)
                         .padding()
                     Spacer()
                 }
@@ -124,9 +144,9 @@ struct DrawView: View {
         Spacer()
     }
     
-    @ViewBuilder func colorPicker() -> some View {
+    @ViewBuilder func penColorPicker() -> some View {
         
-        if self.windowState.isShowingColorPicker {
+        if self.windowState.isShowingPenColorPicker {
             LazyVGrid(columns: columns, spacing: 15) {
                 ForEach(SemanticColor.allCases, id: \.self) { color in
                     Button(action: { self.windowState.currentColor = color  }) {
@@ -152,11 +172,85 @@ struct DrawView: View {
         }
     }
     
+    @ViewBuilder func selectionColorPicker() -> some View {
+        
+        if self.windowState.isShowingSelectionColorPicker {
+            LazyVGrid(columns: columns, spacing: 15) {
+                ForEach(SemanticColor.allCases, id: \.self) { color in
+                    Button(action: { try? self.windowState.recolorSelection(newColor: color) }) {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .foregroundColor(Color(uiColor: color.color))
+                            .frame(width: 30, height: 30)
+                            .overlay{
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .stroke(Color.accentColor, lineWidth: selectionIsColor(color) ? 3 : 0)
+                            }
+                    }
+                    .accessibilityLabel(Text(color.name(isDark: colorScheme == .dark)))
+                    .accessibility(addTraits: selectionIsColor(color) ? .isSelected : [])
+                }
+            }
+            .padding()
+            .background{
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .foregroundColor(Color(uiColor: .systemGray5))
+            }
+            .frame(minWidth: nil, idealWidth: 200, maxWidth: 200, alignment: .center)
+            .transition(.scale.combined(with: .opacity).combined(with: .move(edge: self.horizontalSizeClass == .compact ? .bottom : .top)))
+        }
+    }
+    
+    private func selectionIsColor(_ color: SemanticColor) -> Bool {
+        windowState.selectionColors.count == 1 && windowState.selectionColors.contains(color)
+    }
+    
+    @ViewBuilder func selectionControls() -> some View {
+        Button(action: { withAnimation{ windowState.isShowingSelectionColorPicker.toggle() }}) {
+            ZStack {
+                ForEach(selectionColorIndices, id: \.0) { index, color in
+                    Circle()
+                        .foregroundColor(Color(uiColor: color.color))
+                        .frame(height: 30)
+                        .overlay{
+                            Circle()
+                                .stroke(Color(uiColor: .systemGray5), lineWidth: 3)
+                        }
+                        .offset(x: CGFloat(index) * -10)
+                }
+            }
+            .offset(x: CGFloat(selectionColorIndices.count - 1) * 5)
+            .frame(width: 50, height: 50)
+        }
+        .accessibilityLabel("Change Color")
+        Spacer()
+        Button(action: { }) {
+            ZStack{
+                Image(systemName: "scribble")
+                    .font(.largeTitle)
+                    .foregroundColor(.primary)
+                Image(systemName: "line.diagonal")
+                    .font(.largeTitle)
+                    .foregroundColor(Color.red)
+                
+            }
+            .frame(width: 50)
+        }
+        .accessibilityLabel("Remove Paths")
+    }
+    
     func penAction() -> Void {
         if windowState.currentTool == .pen {
-            withAnimation{windowState.isShowingColorPicker.toggle()}
+            withAnimation{windowState.isShowingPenColorPicker.toggle()}
         } else {
             windowState.currentTool = .pen
+        }
+    }
+    
+    func selectionAction() -> Void {
+        if windowState.currentTool == .selection {
+            withAnimation{ windowState.selection = nil }
+        } else {
+          windowState.currentTool = .selection
         }
     }
 }

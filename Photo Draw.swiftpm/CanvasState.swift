@@ -12,25 +12,53 @@ import UIKit
 import SwiftUI
 import simd
 
-
 class CanvasState: ObservableObject {
-    @Published var paths = [Path]()
+    @Published var paths = [VectorPath]()
     @Published var currentColor: SemanticColor = .primary
     @Published var currentTool: CanvasTool = .pen {
         willSet {
             if newValue != CanvasTool.selection {
                 selection = nil
+                withAnimation{ self.isShowingSelectionColorPicker = false }
             }
             if newValue != CanvasTool.pen {
-                withAnimation{ self.isShowingColorPicker = false }
+                withAnimation{ self.isShowingPenColorPicker = false }
             }
         }
     }
-    @Published var selection: [Path]? = nil
-    @Published var isShowingColorPicker: Bool = false
+    @Published var selection: [VectorPath]? = nil {
+        willSet {
+            withAnimation{ self.isShowingSelectionColorPicker = false }
+            if selection != nil {
+                self.currentTool = .selection
+            }
+        }
+    }
+    @Published var isShowingPenColorPicker: Bool = false
+    @Published var isShowingSelectionColorPicker: Bool = false
     
-    var selectedPaths: [Path] {
+    var selectedPaths: [VectorPath] {
         return selection ?? []
+    }
+    
+var selectionColors: Set<SemanticColor> {
+        return self.selectedPaths.reduce(into: Set<SemanticColor>(), { colorSet, path in
+            colorSet.insert(path.color)
+        })
+    }
+    
+    enum SelectionModifyError: Error {
+        case noSelection
+    }
+    
+    func recolorSelection(newColor: SemanticColor) throws -> Void {
+        guard let selection = selection else {
+            throw SelectionModifyError.noSelection
+        }
+        for path in selection {
+            path.color = newColor
+        }
+        objectWillChange.send()
     }
 }
 
@@ -42,15 +70,22 @@ enum CanvasTool: Equatable {
 }
 
 
-class Path {
-    var curve: BezierCurve
+class VectorPath {
+    var path: BezierKit.Path
     var color: SemanticColor
     var drawMode: DrawMode
     var transform: simd_float3x3
     
-    init(curve: BezierCurve, color: UIColor, drawMode: DrawMode = .solid) {
-        self.curve = curve
+    init(path: BezierKit.Path, color: UIColor, drawMode: DrawMode = .solid) {
+        self.path = path
         self.color = SemanticColor.colorToSemanticColor(color: color)
+        self.drawMode = drawMode
+        self.transform = matrix_identity_float3x3
+    }
+    
+    init(path: BezierKit.Path, semanticColor: SemanticColor, drawMode: DrawMode = .solid) {
+        self.path = path
+        self.color = semanticColor
         self.drawMode = drawMode
         self.transform = matrix_identity_float3x3
     }
@@ -60,7 +95,7 @@ class Path {
     }
 }
 
-enum SemanticColor: CaseIterable {
+enum SemanticColor: CaseIterable, Comparable {
     case primary
     case gray
     case red
