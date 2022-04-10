@@ -29,9 +29,6 @@ class CanvasState: ObservableObject {
     @Published var selection: [VectorPath]? = nil {
         willSet {
             withAnimation{ self.isShowingSelectionColorPicker = false }
-            if selection != nil {
-                self.currentTool = .selection
-            }
         }
     }
     @Published var isShowingPenColorPicker: Bool = false
@@ -60,6 +57,14 @@ var selectionColors: Set<SemanticColor> {
         }
         objectWillChange.send()
     }
+    
+    func removeSelectionPaths() throws -> Void {
+        guard selection != nil else {
+            throw SelectionModifyError.noSelection
+        }
+        let selectionSet = Set<VectorPath>(selectedPaths)
+        paths.removeAll(where: { selectionSet.contains($0) })
+    }
 }
 
 enum CanvasTool: Equatable {
@@ -70,7 +75,20 @@ enum CanvasTool: Equatable {
 }
 
 
-class VectorPath {
+class VectorPath: Equatable, Hashable {
+    static func == (lhs: VectorPath, rhs: VectorPath) -> Bool {
+        lhs.path == rhs.path &&
+        lhs.color == rhs.color &&
+        lhs.drawMode == rhs.drawMode &&
+        lhs.transform == rhs.transform
+    }
+    func hash(into hasher: inout Hasher) {
+            hasher.combine(path)
+            hasher.combine(color)
+            hasher.combine(drawMode)
+    }
+
+    
     var path: BezierKit.Path
     var color: SemanticColor
     var drawMode: DrawMode
@@ -159,7 +177,7 @@ enum SemanticColor: CaseIterable, Comparable {
     
 }
 
-enum DrawMode {
+enum DrawMode: Equatable {
     case solid
     case dashed
 }

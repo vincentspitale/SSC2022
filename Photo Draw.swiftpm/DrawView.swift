@@ -223,7 +223,7 @@ struct DrawView: View {
         }
         .accessibilityLabel("Change Color")
         Spacer()
-        Button(action: { }) {
+        Button(action: { try? windowState.removeSelectionPaths() }) {
             ZStack{
                 Image(systemName: "scribble")
                     .font(.largeTitle)
