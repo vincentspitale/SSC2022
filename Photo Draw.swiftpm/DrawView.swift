@@ -1,5 +1,5 @@
 //
-//  File.swift
+//  DrawView.swift
 //  Photo Draw
 //
 //  Created by Vincent Spitale on 4/6/22.
@@ -30,10 +30,9 @@ struct DrawView: View {
                 .foregroundColor(Color(uiColor: UIColor.systemGray6))
                 .transition(.opacity)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation{ self.windowState.isShowingPenColorPicker = false }
-                    withAnimation{ windowState.selection = nil }
-                }
+            CanvasView(windowState: windowState)
+                .transition(.opacity)
+                .ignoresSafeArea()
             VStack{
                 if horizontalSizeClass == .compact {
                     Spacer()

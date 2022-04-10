@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State var isShowingWelcome: Bool = true
+    @State var isShowingWelcome: Bool = false
     @StateObject var windowState = CanvasState()
     
     var body: some View {
