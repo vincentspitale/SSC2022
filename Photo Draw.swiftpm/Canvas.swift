@@ -11,6 +11,22 @@ import UIKit
 import SwiftUI
 import BezierKit
 
+class AccentColor {
+    static var color: UIColor = {
+        let lightMode = #colorLiteral(red: 0.2, green: 0.6666666667, blue: 0.5960784314, alpha: 1)
+        let darkMode = #colorLiteral(red: 0.5450980392, green: 0.9607843137, blue: 0.8549019608, alpha: 1)
+        let provider: (UITraitCollection) -> UIColor = { traits in
+            if traits.userInterfaceStyle == .dark {
+                return darkMode
+            } else {
+                return lightMode
+            }
+        }
+     return UIColor(dynamicProvider: provider)
+    }()
+    
+}
+
 class Canvas: UIViewController {
     var state: CanvasState
     
@@ -63,6 +79,10 @@ class RenderView: UIView {
         self.state.currentTool == .pen
     }
     
+    var isSelecting: Bool {
+        self.state.currentTool == .selection
+    }
+    
     var selectRect: CGRect? {
         guard let selectStart = selectStart, let selectEnd = selectEnd else {
             return nil
@@ -83,60 +103,97 @@ class RenderView: UIView {
     
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let touch = touches.first, touches.count == 1 else { return }
-        self.finishPath()
-        
-        let currentPoint = touch.location(in: self)
-        
-        let path = PhotoDrawPath(path: BezierKit.Path(components: []), semanticColor: state.currentColor)
-        state.paths.append(path)
-        currentPath = ([currentPoint], path)
+        if isDrawing {
+            guard let touch = touches.first, touches.count == 1 else { return }
+            self.finishPath()
+            
+            let currentPoint = touch.location(in: self)
+            
+            let path = PhotoDrawPath(path: BezierKit.Path(components: []), semanticColor: state.currentColor)
+            state.paths.append(path)
+            currentPath = ([currentPoint], path)
+        } else if isSelecting {
+            guard let touch = touches.first, touches.count == 1 else { return }
+            let currentPoint = touch.location(in: self)
+            self.selectStart = currentPoint
+        }
     }
         
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard isDrawing else { return }
-        guard let touch = touches.first, touches.count == 1 else { return }
-        let currentPoint = touch.location(in: self)
-        
-        guard var currentPath = currentPath else {
-            return
+        if isDrawing {
+            guard let touch = touches.first, touches.count == 1 else { return }
+            let currentPoint = touch.location(in: self)
+            
+            guard var currentPath = currentPath else {
+                return
+            }
+            currentPath.0.append(currentPoint)
+            self.currentPath = currentPath
+            // Update bezier path to fit new data
+            let newPath = LeastSquaresPath.pathFromPoints(currentPath.0)
+            currentPath.1.updatePath(newPath: newPath)
+            
+            self.setNeedsDisplay()
+        } else if isSelecting {
+            guard let touch = touches.first, touches.count == 1 else { return }
+            let currentPoint = touch.location(in: self)
+            self.selectEnd = currentPoint
+            self.setNeedsDisplay()
         }
-        currentPath.0.append(currentPoint)
-        self.currentPath = currentPath
-        // update bezier path
-        let newPath = LeastSquaresPath.pathFromPoints(currentPath.0)
-        currentPath.1.updatePath(newPath: newPath)
-        
-        self.setNeedsDisplay()
     }
         
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard isDrawing else { return }
-        guard let touch = touches.first, touches.count == 1 else { return }
-        let currentPoint = touch.location(in: self)
-        
-        guard var currentPath = currentPath else {
-            return
+        if isDrawing {
+            guard let touch = touches.first, touches.count == 1 else { return }
+            let currentPoint = touch.location(in: self)
+            
+            guard var currentPath = currentPath else {
+                return
+            }
+            currentPath.0.append(currentPoint)
+            self.currentPath = currentPath
+            // Update bezier path to fit new data
+            let newPath = LeastSquaresPath.pathFromPoints(currentPath.0)
+            currentPath.1.updatePath(newPath: newPath)
+            
+            self.finishPath()
+            
+            self.setNeedsDisplay()
+        } else if isSelecting {
+            guard let touch = touches.first, touches.count == 1 else { return }
+            let currentPoint = touch.location(in: self)
+            self.selectEnd = currentPoint
+            self.finishSelection()
+            self.setNeedsDisplay()
         }
-        currentPath.0.append(currentPoint)
-        self.currentPath = currentPath
-        // update bezier path
-        let newPath = LeastSquaresPath.pathFromPoints(currentPath.0)
-        currentPath.1.updatePath(newPath: newPath)
-        
-        self.finishPath()
-        
-        self.setNeedsDisplay()
     }
     
     private func finishPath() {
         self.currentPath = nil
     }
     
+    private func finishSelection() {
+        self.selectStart = nil
+        self.selectEnd = nil
+    }
+    
     override func draw(_ rect: CGRect) {
         let context = UIGraphicsGetCurrentContext()
         context?.setLineCap(.round)
-        // draw all bezier paths
+        context?.setShouldAntialias(true)
+        
+        // Draw selection
+        if let selectRect = selectRect {
+            context?.setFillColor(AccentColor.color.withAlphaComponent(0.3).cgColor)
+            context?.setStrokeColor(AccentColor.color.cgColor)
+            context?.setLineWidth(2)
+            context?.beginPath()
+            context?.addRect(selectRect)
+            context?.drawPath(using: .fillStroke)
+            context?.strokePath()
+        }
+        
+        // Draw all bezier paths
         for path in state.paths {
             context?.setFillColor(path.color.color.cgColor)
             context?.setStrokeColor(path.color.color.cgColor)
