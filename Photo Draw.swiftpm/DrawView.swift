@@ -13,7 +13,7 @@ struct DrawView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Environment(\.colorScheme) var colorScheme
     
-    let columns = [
+    let colorColumns = [
         GridItem(.adaptive(minimum: 30))
     ]
     
@@ -55,7 +55,6 @@ struct DrawView: View {
                             Image(systemName: "lasso")
                                 .font(.largeTitle)
                                 .foregroundColor(windowState.currentTool == .selection ? .primary : .secondary)
-                            
                                 .frame(width: 50)
                         }
                         .accessibilityLabel("Select")
@@ -80,8 +79,6 @@ struct DrawView: View {
                     Spacer()
                 }
             }
-            
-            
         }
     }
     
@@ -144,9 +141,8 @@ struct DrawView: View {
     }
     
     @ViewBuilder func penColorPicker() -> some View {
-        
         if self.windowState.isShowingPenColorPicker {
-            LazyVGrid(columns: columns, spacing: 15) {
+            LazyVGrid(columns: colorColumns, spacing: 15) {
                 ForEach(SemanticColor.allCases, id: \.self) { color in
                     Button(action: { self.windowState.currentColor = color  }) {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
@@ -172,9 +168,8 @@ struct DrawView: View {
     }
     
     @ViewBuilder func selectionColorPicker() -> some View {
-        
         if self.windowState.isShowingSelectionColorPicker {
-            LazyVGrid(columns: columns, spacing: 15) {
+            LazyVGrid(columns: colorColumns, spacing: 15) {
                 ForEach(SemanticColor.allCases, id: \.self) { color in
                     Button(action: { try? self.windowState.recolorSelection(newColor: color) }) {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
@@ -206,6 +201,7 @@ struct DrawView: View {
     @ViewBuilder func selectionControls() -> some View {
         Button(action: { withAnimation{ windowState.isShowingSelectionColorPicker.toggle() }}) {
             ZStack {
+                // Display the colors of the paths that are selected
                 ForEach(selectionColorIndices, id: \.0) { index, color in
                     Circle()
                         .foregroundColor(Color(uiColor: color.color))

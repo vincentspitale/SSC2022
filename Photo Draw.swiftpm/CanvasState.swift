@@ -13,20 +13,22 @@ import SwiftUI
 import simd
 
 class CanvasState: ObservableObject {
-    @Published var paths = [VectorPath]()
+    @Published var paths = [PhotoDrawPath]()
     @Published var currentColor: SemanticColor = .primary
     @Published var currentTool: CanvasTool = .pen {
         willSet {
+            // No longer in selection mode, remove selection
             if newValue != CanvasTool.selection {
                 selection = nil
-                withAnimation{ self.isShowingSelectionColorPicker = false }
             }
+            // No longer in pen mode, dismiss the pen color picker
             if newValue != CanvasTool.pen {
                 withAnimation{ self.isShowingPenColorPicker = false }
             }
         }
     }
-    @Published var selection: [VectorPath]? = nil {
+    @Published var selection: [PhotoDrawPath]? = nil {
+        // Selection changed, the selection color picker should not be visible
         willSet {
             withAnimation{ self.isShowingSelectionColorPicker = false }
         }
@@ -34,11 +36,11 @@ class CanvasState: ObservableObject {
     @Published var isShowingPenColorPicker: Bool = false
     @Published var isShowingSelectionColorPicker: Bool = false
     
-    var selectedPaths: [VectorPath] {
+    var selectedPaths: [PhotoDrawPath] {
         return selection ?? []
     }
     
-var selectionColors: Set<SemanticColor> {
+    var selectionColors: Set<SemanticColor> {
         return self.selectedPaths.reduce(into: Set<SemanticColor>(), { colorSet, path in
             colorSet.insert(path.color)
         })
@@ -62,8 +64,9 @@ var selectionColors: Set<SemanticColor> {
         guard selection != nil else {
             throw SelectionModifyError.noSelection
         }
-        let selectionSet = Set<VectorPath>(selectedPaths)
+        let selectionSet = Set<PhotoDrawPath>(selectedPaths)
         paths.removeAll(where: { selectionSet.contains($0) })
+        self.selection = nil
     }
 }
 
@@ -75,8 +78,8 @@ enum CanvasTool: Equatable {
 }
 
 
-class VectorPath: Equatable, Hashable {
-    static func == (lhs: VectorPath, rhs: VectorPath) -> Bool {
+class PhotoDrawPath: Equatable, Hashable {
+    static func == (lhs: PhotoDrawPath, rhs: PhotoDrawPath) -> Bool {
         lhs.path == rhs.path &&
         lhs.color == rhs.color &&
         lhs.drawMode == rhs.drawMode &&
@@ -110,6 +113,11 @@ class VectorPath: Equatable, Hashable {
     
     func resize(transform: simd_float3x3) {
         self.transform *= transform
+    }
+    
+    // Allow the path to be modified with a new path to fit to the new point data
+    func updatePath(newPath: BezierKit.Path) {
+        self.path = newPath
     }
 }
 
