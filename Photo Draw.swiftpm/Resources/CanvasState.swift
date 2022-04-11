@@ -71,10 +71,11 @@ class CanvasState: ObservableObject {
 }
 
 enum CanvasTool: Equatable {
-    case pen
-    case selection
     case touch
+    case pen
     case remove
+    case selection
+    case placePhoto
 }
 
 

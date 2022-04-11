@@ -5,27 +5,11 @@
 //  Created by Vincent Spitale on 4/6/22.
 //
 
-import Foundation
+import BezierKit
 import CoreGraphics
+import Foundation
 import UIKit
 import SwiftUI
-import BezierKit
-
-class AccentColor {
-    static var color: UIColor = {
-        let lightMode = #colorLiteral(red: 0.2, green: 0.6666666667, blue: 0.5960784314, alpha: 1)
-        let darkMode = #colorLiteral(red: 0.5450980392, green: 0.9607843137, blue: 0.8549019608, alpha: 1)
-        let provider: (UITraitCollection) -> UIColor = { traits in
-            if traits.userInterfaceStyle == .dark {
-                return darkMode
-            } else {
-                return lightMode
-            }
-        }
-     return UIColor(dynamicProvider: provider)
-    }()
-    
-}
 
 class Canvas: UIViewController {
     var state: CanvasState
@@ -103,27 +87,22 @@ class RenderView: UIView {
     
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first, event?.allTouches?.count == 1 else { return }
+        let currentPoint = touch.location(in: self)
         if isDrawing {
-            guard let touch = touches.first, touches.count == 1 else { return }
             self.finishPath()
-            
-            let currentPoint = touch.location(in: self)
-            
             let path = PhotoDrawPath(path: BezierKit.Path(components: []), semanticColor: state.currentColor)
             state.paths.append(path)
             currentPath = ([currentPoint], path)
         } else if isSelecting {
-            guard let touch = touches.first, touches.count == 1 else { return }
-            let currentPoint = touch.location(in: self)
             self.selectStart = currentPoint
         }
     }
         
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first, event?.allTouches?.count == 1 else { return }
+        let currentPoint = touch.location(in: self)
         if isDrawing {
-            guard let touch = touches.first, touches.count == 1 else { return }
-            let currentPoint = touch.location(in: self)
-            
             guard var currentPath = currentPath else {
                 return
             }
@@ -135,18 +114,23 @@ class RenderView: UIView {
             
             self.setNeedsDisplay()
         } else if isSelecting {
-            guard let touch = touches.first, touches.count == 1 else { return }
-            let currentPoint = touch.location(in: self)
             self.selectEnd = currentPoint
             self.setNeedsDisplay()
         }
     }
         
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.handleTouchStop(touches)
+    }
+    
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.handleTouchStop(touches)
+    }
+    
+    private func handleTouchStop(_ touches: Set<UITouch>) {
+        guard let touch = touches.first else { return }
+        let currentPoint = touch.location(in: self)
         if isDrawing {
-            guard let touch = touches.first, touches.count == 1 else { return }
-            let currentPoint = touch.location(in: self)
-            
             guard var currentPath = currentPath else {
                 return
             }
@@ -160,8 +144,6 @@ class RenderView: UIView {
             
             self.setNeedsDisplay()
         } else if isSelecting {
-            guard let touch = touches.first, touches.count == 1 else { return }
-            let currentPoint = touch.location(in: self)
             self.selectEnd = currentPoint
             self.finishSelection()
             self.setNeedsDisplay()
@@ -173,6 +155,7 @@ class RenderView: UIView {
     }
     
     private func finishSelection() {
+        #warning("Implement")
         self.selectStart = nil
         self.selectEnd = nil
     }
@@ -195,13 +178,40 @@ class RenderView: UIView {
         
         // Draw all bezier paths
         for path in state.paths {
+            // Draw selection border around selected paths
+            if state.selectedPaths.contains(path) {
+                context?.setFillColor(AccentColor.color.cgColor)
+                context?.setStrokeColor(AccentColor.color.cgColor)
+                context?.setLineWidth(3)
+                context?.addPath(path.path.cgPath)
+                context?.drawPath(using: .fillStroke)
+                context?.strokePath()
+            }
+            
             context?.setFillColor(path.color.color.cgColor)
             context?.setStrokeColor(path.color.color.cgColor)
+            context?.setLineWidth(2)
             context?.addPath(path.path.cgPath)
             context?.drawPath(using: .fillStroke)
             context?.strokePath()
         }
     }
+    
+}
+
+class AccentColor {
+    static var color: UIColor = {
+        let lightMode = #colorLiteral(red: 0.2, green: 0.6666666667, blue: 0.5960784314, alpha: 1)
+        let darkMode = #colorLiteral(red: 0.5450980392, green: 0.9607843137, blue: 0.8549019608, alpha: 1)
+        let provider: (UITraitCollection) -> UIColor = { traits in
+            if traits.userInterfaceStyle == .dark {
+                return darkMode
+            } else {
+                return lightMode
+            }
+        }
+     return UIColor(dynamicProvider: provider)
+    }()
     
 }
 

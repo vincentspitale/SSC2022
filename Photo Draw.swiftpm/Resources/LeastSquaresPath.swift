@@ -10,11 +10,12 @@ import CoreGraphics
 import Foundation
 
 class LeastSquaresPath {
-    // Fits the point data to a cubic bezier curve
+    private static var errorThreshold: CGFloat = 7.0
+    // Fits the point data to cubic bezier curves
     static func pathFromPoints(_ points: [CGPoint]) -> BezierKit.Path {
         var pathSoFar = [BezierKit.CubicCurve]()
         
-        
+        #warning("Implement")
         
         return BezierKit.Path(components: pathSoFar.map {
             PathComponent(curve: $0)
