@@ -178,10 +178,10 @@ enum SemanticColor: CaseIterable, Comparable {
     }
     
     public static func colorToSemanticColor(color: UIColor) -> SemanticColor {
-        let hue: UnsafeMutablePointer<CGFloat>? = nil
-        let saturation: UnsafeMutablePointer<CGFloat>? = nil
-        color.getHue(hue, saturation: saturation, brightness: nil, alpha: nil)
-        if let hue = hue?.pointee, let saturation = saturation, saturation.pointee > 0.4  {
+        var hue: CGFloat = 0.0
+        var saturation: CGFloat = 0.0
+        color.getHue(&hue, saturation: &saturation, brightness: nil, alpha: nil)
+        if saturation > 0.4  {
             // Have only a few colors match options to prevent incorrect conversions
             let supportedColors: [SemanticColor] = [SemanticColor.red, SemanticColor.green, SemanticColor.blue]
             let hueColors = supportedColors.map { ($0, SemanticColor.colorHue(color: $0.color)) }
@@ -203,9 +203,9 @@ enum SemanticColor: CaseIterable, Comparable {
     }
     
     private static func colorHue(color: UIColor) -> CGFloat {
-        let hue: UnsafeMutablePointer<CGFloat>? = nil
-        color.getHue(hue, saturation: nil, brightness: nil, alpha: nil)
-        return hue?.pointee ?? 0.0
+        var hue: CGFloat = 0.0
+        color.getHue(&hue, saturation: nil, brightness: nil, alpha: nil)
+        return hue
     }
     
 }
