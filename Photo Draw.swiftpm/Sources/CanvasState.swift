@@ -184,14 +184,14 @@ enum SemanticColor: CaseIterable, Comparable {
         if let hue = hue?.pointee, let saturation = saturation, saturation.pointee > 0.4  {
             // Have only a few colors match options to prevent incorrect conversions
             let supportedColors: [SemanticColor] = [SemanticColor.red, SemanticColor.green, SemanticColor.blue]
-            let hueColors = supportedColors.map { ($0, SemanticColor.colorHue(color: $0.color)) }.sorted(by: { $0.1 < $1.1 })
-            let closestColor: (SemanticColor, CGFloat)? = hueColors.reduce(into: nil, { accumulator, color in
-                if let (_, previousHue) = accumulator {
-                    if abs(hue - previousHue) < abs(hue - color.1) {
-                        accumulator = color
+            let hueColors = supportedColors.map { ($0, SemanticColor.colorHue(color: $0.color)) }
+            let closestColor: (SemanticColor, CGFloat)? = hueColors.reduce(into: nil, { nearestColor, color in
+                if let (_, previousHue) = nearestColor {
+                    if abs(hue - color.1) < abs(hue - previousHue)  {
+                        nearestColor = color
                     }
                 } else {
-                    accumulator = color
+                    nearestColor = color
                 }
             })
             if let closestColor = closestColor, abs(closestColor.1 - hue) < 0.1 {
