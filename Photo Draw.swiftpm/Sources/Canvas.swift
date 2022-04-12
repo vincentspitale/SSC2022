@@ -59,13 +59,8 @@ class RenderView: UIView {
     
     var currentPath: ([CGPoint], PhotoDrawPath)? = nil
     
-    var isDrawing: Bool {
-        self.state.currentTool == .pen
-    }
-    
-    var isSelecting: Bool {
-        self.state.currentTool == .selection
-    }
+    var removePoint: CGPoint? = nil
+    var pathsToBeDeleted = Set<PhotoDrawPath>()
     
     var selectRect: CGRect? {
         guard let selectStart = selectStart, let selectEnd = selectEnd else {
@@ -89,20 +84,26 @@ class RenderView: UIView {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first, event?.allTouches?.count == 1 else { return }
         let currentPoint = touch.location(in: self)
-        if isDrawing {
+        switch self.state.currentTool {
+        case .pen:
             self.finishPath()
             let path = PhotoDrawPath(path: BezierKit.Path(components: []), semanticColor: state.currentColor)
             state.paths.append(path)
             currentPath = ([currentPoint], path)
-        } else if isSelecting {
+        case .selection:
             self.selectStart = currentPoint
+        case .remove:
+            self.removePoint = currentPoint
+        default:
+            break
         }
     }
         
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first, event?.allTouches?.count == 1 else { return }
         let currentPoint = touch.location(in: self)
-        if isDrawing {
+        switch self.state.currentTool {
+        case .pen:
             guard var currentPath = currentPath else {
                 return
             }
@@ -112,11 +113,14 @@ class RenderView: UIView {
             let newPath = LeastSquaresPath.pathFromPoints(currentPath.0)
             currentPath.1.updatePath(newPath: newPath)
             
-            self.setNeedsDisplay()
-        } else if isSelecting {
+        case .selection:
             self.selectEnd = currentPoint
-            self.setNeedsDisplay()
+        case .remove:
+            self.removePoint = currentPoint
+        default:
+            break
         }
+        self.setNeedsDisplay()
     }
         
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -130,7 +134,8 @@ class RenderView: UIView {
     private func handleTouchStop(_ touches: Set<UITouch>) {
         guard let touch = touches.first else { return }
         let currentPoint = touch.location(in: self)
-        if isDrawing {
+        switch self.state.currentTool {
+        case .pen:
             guard var currentPath = currentPath else {
                 return
             }
@@ -141,13 +146,16 @@ class RenderView: UIView {
             currentPath.1.updatePath(newPath: newPath)
             
             self.finishPath()
-            
-            self.setNeedsDisplay()
-        } else if isSelecting {
+        case .selection:
             self.selectEnd = currentPoint
             self.finishSelection()
-            self.setNeedsDisplay()
+        case .remove:
+            self.finishRemove()
+        default:
+            break
         }
+        
+        self.setNeedsDisplay()
     }
     
     private func finishPath() {
@@ -160,6 +168,10 @@ class RenderView: UIView {
         self.selectEnd = nil
     }
     
+    private func finishRemove() {
+        self.removePoint = nil
+    }
+    
     override func draw(_ rect: CGRect) {
         let context = UIGraphicsGetCurrentContext()
         context?.setLineCap(.round)
@@ -170,10 +182,20 @@ class RenderView: UIView {
             context?.setFillColor(AccentColor.color.withAlphaComponent(0.3).cgColor)
             context?.setStrokeColor(AccentColor.color.cgColor)
             context?.setLineWidth(2)
-            context?.beginPath()
             context?.addRect(selectRect)
             context?.drawPath(using: .fillStroke)
             context?.strokePath()
+        }
+        
+        // Draw remove tool
+        if let removePoint = removePoint {
+            context?.setFillColor(UIColor.systemRed.withAlphaComponent(0.3).cgColor)
+            context?.setStrokeColor(UIColor.systemRed.cgColor)
+            context?.setLineWidth(2)
+            
+            let rect = CGRect(x: removePoint.x - 5, y: removePoint.y - 5, width: 10, height: 10)
+            context?.addEllipse(in: rect)
+            context?.drawPath(using: .fillStroke)
         }
         
         // Draw all bezier paths
@@ -188,8 +210,11 @@ class RenderView: UIView {
                 context?.strokePath()
             }
             
-            context?.setFillColor(path.color.color.cgColor)
-            context?.setStrokeColor(path.color.color.cgColor)
+            // Paths that have been touched by the remove tool should have lower opacity
+            let color = pathsToBeDeleted.contains(path) ? path.color.color.withAlphaComponent(0.3).cgColor : path.color.color.cgColor
+            
+            context?.setFillColor(color)
+            context?.setStrokeColor(color)
             context?.setLineWidth(2)
             context?.addPath(path.path.cgPath)
             context?.drawPath(using: .fillStroke)

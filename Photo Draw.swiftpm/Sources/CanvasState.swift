@@ -79,20 +79,7 @@ enum CanvasTool: Equatable {
 }
 
 
-class PhotoDrawPath: Equatable, Hashable {
-    static func == (lhs: PhotoDrawPath, rhs: PhotoDrawPath) -> Bool {
-        lhs.path == rhs.path &&
-        lhs.color == rhs.color &&
-        lhs.drawMode == rhs.drawMode &&
-        lhs.transform == rhs.transform
-    }
-    func hash(into hasher: inout Hasher) {
-            hasher.combine(path)
-            hasher.combine(color)
-            hasher.combine(drawMode)
-    }
-
-    
+class PhotoDrawPath {
     var path: BezierKit.Path
     var color: SemanticColor
     var drawMode: DrawMode
@@ -122,7 +109,22 @@ class PhotoDrawPath: Equatable, Hashable {
     }
 }
 
+extension PhotoDrawPath: Equatable, Hashable {
+    static func == (lhs: PhotoDrawPath, rhs: PhotoDrawPath) -> Bool {
+        lhs.path == rhs.path &&
+        lhs.color == rhs.color &&
+        lhs.drawMode == rhs.drawMode &&
+        lhs.transform == rhs.transform
+    }
+    func hash(into hasher: inout Hasher) {
+            hasher.combine(path)
+            hasher.combine(color)
+            hasher.combine(drawMode)
+    }
+}
+
 enum SemanticColor: CaseIterable, Comparable {
+    // Supported colors
     case primary
     case gray
     case red
@@ -153,6 +155,7 @@ enum SemanticColor: CaseIterable, Comparable {
         }
     }
     
+    // Accessibility label for color
     public func name(isDark: Bool) -> String {
         switch self {
         case .primary:

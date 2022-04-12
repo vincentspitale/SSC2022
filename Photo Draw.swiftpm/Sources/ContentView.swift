@@ -8,7 +8,7 @@ struct ContentView: View {
     var body: some View {
         ZStack{
             if isShowingWelcome {
-            WelcomeView(isContinued: $isShowingWelcome)
+                WelcomeView(isContinued: $isShowingWelcome)
             }
             if !isShowingWelcome {
                 DrawView(windowState: windowState)

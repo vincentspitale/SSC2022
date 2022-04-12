@@ -15,6 +15,7 @@ class LeastSquaresPath {
     static func pathFromPoints(_ points: [CGPoint]) -> BezierKit.Path {
         var pathSoFar = [BezierKit.CubicCurve]()
         
+        
         #warning("Implement")
         
         return BezierKit.Path(components: pathSoFar.map {

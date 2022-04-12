@@ -17,10 +17,11 @@ struct DrawView: View {
         GridItem(.adaptive(minimum: 30))
     ]
     
+    // Get the first three colors that are in the selection
     var selectionColorIndices: [(Int, SemanticColor)] {
-        let colors = Array(windowState.selectionColors).enumerated().filter { index, color in
+        let colors = Array(windowState.selectionColors).sorted().enumerated().filter { index, color in
             index < 3
-        }.map{ $0.1 }.sorted()
+        }.map{ $0.1 }
         return Array(zip(colors.indices, colors))
     }
     
@@ -48,20 +49,35 @@ struct DrawView: View {
                         .foregroundColor(Color(uiColor: UIColor.systemGray5))
                     HStack {
                         Spacer()
-                        if windowState.selection == nil {
-                            self.controls()
-                        }
-                        Button(action: {selectionAction()}) {
-                            Image(systemName: "lasso")
-                                .font(.largeTitle)
-                                .foregroundColor(windowState.currentTool == .selection ? .primary : .secondary)
-                                .frame(width: 50)
-                        }
-                        .accessibilityLabel("Select")
-                        .accessibility(addTraits: self.windowState.currentTool == .selection ? .isSelected : [])
-                        if windowState.selection != nil {
-                            Spacer()
-                            self.selectionControls()
+                        if windowState.currentTool != .placePhoto {
+                            if windowState.selection == nil {
+                                self.controls()
+                            }
+                            Button(action: {selectionAction()}) {
+                                Image(systemName: "lasso")
+                                    .font(.largeTitle)
+                                    .foregroundColor(windowState.currentTool == .selection ? .primary : .secondary)
+                                    .frame(width: 50)
+                            }
+                            .accessibilityLabel("Select")
+                            .accessibility(addTraits: self.windowState.currentTool == .selection ? .isSelected : [])
+                            if windowState.selection != nil {
+                                Spacer()
+                                self.selectionControls()
+                            }
+                        } else {
+                            Button(action: {
+                                #warning("Implement")
+                            }) {
+                                    Text("Place and Convert")
+                                        .font(.headline)
+                                        .bold()
+                                        .foregroundColor(Color(uiColor: UIColor.systemBackground))
+                                        .padding()
+                                        .frame(width: 200)
+                                        .background(Color.accentColor)
+                                        .cornerRadius(.greatestFiniteMagnitude)
+                            }
                         }
                         Spacer()
                     }
@@ -114,7 +130,24 @@ struct DrawView: View {
         .accessibilityValue(Text(windowState.currentColor.name(isDark: colorScheme == .dark)))
         .accessibility(addTraits: self.windowState.currentTool == .pen ? .isSelected : [])
         Spacer()
-        Button(action: {}) {
+        Menu {
+            Button(action: {
+#warning("Implement")
+            }) {
+                Label("Camera Scan", systemImage: "viewfinder")
+            }
+            Button(action: {
+#warning("Implement")
+            }) {
+                Label("Photo Library", systemImage: "photo.fill")
+            }
+            
+            Button(action: {
+#warning("Implement")
+            }) {
+                Label("Example Photos", systemImage: "photo.on.rectangle.angled")
+            }
+        } label: {
             Image(systemName: "photo")
                 .font(.largeTitle)
                 .foregroundColor(.accentColor)
@@ -194,10 +227,6 @@ struct DrawView: View {
         }
     }
     
-    private func selectionIsColor(_ color: SemanticColor) -> Bool {
-        windowState.selectionColors.count == 1 && windowState.selectionColors.contains(color)
-    }
-    
     @ViewBuilder func selectionControls() -> some View {
         Button(action: { withAnimation{ windowState.isShowingSelectionColorPicker.toggle() }}) {
             ZStack {
@@ -233,7 +262,11 @@ struct DrawView: View {
         .accessibilityLabel("Remove Paths")
     }
     
-    func penAction() -> Void {
+    private func selectionIsColor(_ color: SemanticColor) -> Bool {
+        windowState.selectionColors.count == 1 && windowState.selectionColors.contains(color)
+    }
+    
+    private func penAction() -> Void {
         if windowState.currentTool == .pen {
             withAnimation{windowState.isShowingPenColorPicker.toggle()}
         } else {
@@ -241,11 +274,11 @@ struct DrawView: View {
         }
     }
     
-    func selectionAction() -> Void {
+    private func selectionAction() -> Void {
         if windowState.currentTool == .selection {
             withAnimation{ windowState.selection = nil }
         } else {
-          windowState.currentTool = .selection
+            windowState.currentTool = .selection
         }
     }
 }
