@@ -66,7 +66,8 @@ class RenderView: UIView {
         guard let selectStart = selectStart, let selectEnd = selectEnd else {
             return nil
         }
-        return CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y), width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
+        return CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
+                      width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
     }
     
     init(state: CanvasState, frame: CGRect) {
@@ -87,6 +88,7 @@ class RenderView: UIView {
         switch self.state.currentTool {
         case .pen:
             self.finishPath()
+            // Start a new path
             let path = PhotoDrawPath(path: BezierKit.Path(components: []), semanticColor: state.currentColor)
             state.paths.append(path)
             currentPath = ([currentPoint], path)
@@ -179,8 +181,8 @@ class RenderView: UIView {
         
         // Draw selection
         if let selectRect = selectRect {
-            context?.setFillColor(AccentColor.color.withAlphaComponent(0.3).cgColor)
-            context?.setStrokeColor(AccentColor.color.cgColor)
+            context?.setFillColor(AppColors.accent.withAlphaComponent(0.3).cgColor)
+            context?.setStrokeColor(AppColors.accent.cgColor)
             context?.setLineWidth(2)
             context?.addRect(selectRect)
             context?.drawPath(using: .fillStroke)
@@ -202,8 +204,8 @@ class RenderView: UIView {
         for path in state.paths {
             // Draw selection border around selected paths
             if state.selectedPaths.contains(path) {
-                context?.setFillColor(AccentColor.color.cgColor)
-                context?.setStrokeColor(AccentColor.color.cgColor)
+                context?.setFillColor(AppColors.accent.cgColor)
+                context?.setStrokeColor(AppColors.accent.cgColor)
                 context?.setLineWidth(3)
                 context?.addPath(path.path.cgPath)
                 context?.drawPath(using: .fillStroke)
@@ -224,8 +226,8 @@ class RenderView: UIView {
     
 }
 
-class AccentColor {
-    static var color: UIColor = {
+class AppColors {
+    static var accent: UIColor = {
         let lightMode = #colorLiteral(red: 0.2, green: 0.6666666667, blue: 0.5960784314, alpha: 1)
         let darkMode = #colorLiteral(red: 0.5450980392, green: 0.9607843137, blue: 0.8549019608, alpha: 1)
         let provider: (UITraitCollection) -> UIColor = { traits in

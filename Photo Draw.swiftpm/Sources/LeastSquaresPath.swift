@@ -16,7 +16,6 @@ class LeastSquaresPath {
         var pathSoFar = [BezierKit.CubicCurve]()
         
         
-        #warning("Implement")
         
         return BezierKit.Path(components: pathSoFar.map {
             PathComponent(curve: $0)
