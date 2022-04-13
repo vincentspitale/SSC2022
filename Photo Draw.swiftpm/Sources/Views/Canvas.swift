@@ -225,7 +225,7 @@ class RenderView: UIView {
             if state.selectedPaths.contains(path) {
                 context?.setFillColor(AppColors.accent.cgColor)
                 context?.setStrokeColor(AppColors.accent.cgColor)
-                context?.setLineWidth(3)
+                context?.setLineWidth(5)
                 context?.addPath(path.path.cgPath)
                 context?.drawPath(using: .fillStroke)
                 context?.strokePath()
@@ -275,6 +275,7 @@ struct CanvasView: UIViewControllerRepresentable {
 
 
 fileprivate extension BezierKit.Path {
+    // Determine if this path should be selected by a selection area
     func intersectsOrContainedBy(rect: CGRect) -> Bool {
         let rectPath = BezierKit.Path(cgPath: CGPath(rect: rect, transform: nil))
         return self.intersects(rectPath) || rectPath.contains(self)

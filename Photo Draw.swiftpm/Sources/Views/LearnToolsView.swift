@@ -20,9 +20,7 @@ struct LearnToolsView: View {
                     Text("Your Drawing Tools").font(.title)
                         .bold()
                         .padding(.bottom)
-                    
                     Text("")
-                    
                     HStack {
                         Spacer()
                     }

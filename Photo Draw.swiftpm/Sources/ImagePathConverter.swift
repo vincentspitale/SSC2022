@@ -15,10 +15,9 @@ fileprivate struct Point: Hashable {
 }
 
 class ImagePathConverter {
-
     struct Pixel {
-        let r, g, b, a: UInt8
         let x, y: Int
+        let r, g, b, a: UInt8
     }
 
     let image: UIImage
@@ -55,7 +54,7 @@ class ImagePathConverter {
         let g = pixelData[imageIndex * 4 + 1]
         let b = pixelData[imageIndex * 4 + 2]
         let a = pixelData[imageIndex * 4 + 3]
-        return Pixel(r: r, g: g, b: b, a: a, x: p.x, y: p.y)
+        return Pixel(x: p.x, y: p.y, r: r, g: g, b: b, a: a)
     }
     
     private func findGroupedConnectedPixels() -> [Set<Point>] {
