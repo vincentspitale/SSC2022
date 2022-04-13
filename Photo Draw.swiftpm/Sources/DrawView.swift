@@ -113,6 +113,7 @@ struct DrawView: View {
                 Image(systemName: "pencil.tip")
                     .font(.largeTitle)
                     .foregroundColor(windowState.currentTool == .pen ? .primary : .secondary)
+                // Overlay selected color
                 Image(systemName: "pencil.tip")
                     .font(.largeTitle)
                     .foregroundColor(Color(uiColor: windowState.currentColor.color))
