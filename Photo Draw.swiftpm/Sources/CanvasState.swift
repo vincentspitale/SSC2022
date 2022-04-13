@@ -82,20 +82,17 @@ enum CanvasTool: Equatable {
 class PhotoDrawPath {
     var path: BezierKit.Path
     var color: SemanticColor
-    var drawMode: DrawMode
     var transform: simd_float3x3
     
-    init(path: BezierKit.Path, color: UIColor, drawMode: DrawMode = .solid) {
+    init(path: BezierKit.Path, color: UIColor) {
         self.path = path
         self.color = SemanticColor.colorToSemanticColor(color: color)
-        self.drawMode = drawMode
         self.transform = matrix_identity_float3x3
     }
     
-    init(path: BezierKit.Path, semanticColor: SemanticColor, drawMode: DrawMode = .solid) {
+    init(path: BezierKit.Path, semanticColor: SemanticColor) {
         self.path = path
         self.color = semanticColor
-        self.drawMode = drawMode
         self.transform = matrix_identity_float3x3
     }
     
@@ -113,13 +110,11 @@ extension PhotoDrawPath: Equatable, Hashable {
     static func == (lhs: PhotoDrawPath, rhs: PhotoDrawPath) -> Bool {
         lhs.path == rhs.path &&
         lhs.color == rhs.color &&
-        lhs.drawMode == rhs.drawMode &&
         lhs.transform == rhs.transform
     }
     func hash(into hasher: inout Hasher) {
             hasher.combine(path)
             hasher.combine(color)
-            hasher.combine(drawMode)
     }
 }
 
@@ -180,8 +175,10 @@ enum SemanticColor: CaseIterable, Comparable {
     public static func colorToSemanticColor(color: UIColor) -> SemanticColor {
         var hue: CGFloat = 0.0
         var saturation: CGFloat = 0.0
-        color.getHue(&hue, saturation: &saturation, brightness: nil, alpha: nil)
-        if saturation > 0.4  {
+        var brightness: CGFloat = 0.0
+        color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
+        // If the saturation and brightness are high enough, try to match to a color
+        if saturation > 0.4 && brightness > 0.2  {
             // Have only a few colors match options to prevent incorrect conversions
             let supportedColors: [SemanticColor] = [SemanticColor.red, SemanticColor.green, SemanticColor.blue]
             let hueColors = supportedColors.map { ($0, SemanticColor.colorHue(color: $0.color)) }
@@ -208,9 +205,4 @@ enum SemanticColor: CaseIterable, Comparable {
         return hue
     }
     
-}
-
-enum DrawMode: Equatable {
-    case solid
-    case dashed
 }

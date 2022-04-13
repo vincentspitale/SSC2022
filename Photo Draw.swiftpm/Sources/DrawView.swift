@@ -21,7 +21,7 @@ struct DrawView: View {
     var selectionColorIndices: [(Int, SemanticColor)] {
         let colors = Array(windowState.selectionColors).sorted().enumerated().filter { index, color in
             index < 3
-        }.map{ $0.1 }
+        }.map { $0.1 }
         return Array(zip(colors.indices, colors))
     }
     

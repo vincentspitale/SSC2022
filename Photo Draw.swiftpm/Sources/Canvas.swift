@@ -57,7 +57,7 @@ class RenderView: UIView {
     var selectStart: CGPoint?
     var selectEnd: CGPoint?
     
-    var currentPath: ([CGPoint], PhotoDrawPath)? = nil
+    var currentPath: (dataPoints: [CGPoint], path: PhotoDrawPath)? = nil
     
     var removePoint: CGPoint? = nil
     var pathsToBeDeleted = Set<PhotoDrawPath>()
@@ -109,11 +109,11 @@ class RenderView: UIView {
             guard var currentPath = currentPath else {
                 return
             }
-            currentPath.0.append(currentPoint)
+            currentPath.dataPoints.append(currentPoint)
             self.currentPath = currentPath
             // Update bezier path to fit new data
-            let newPath = LeastSquaresPath.pathFromPoints(currentPath.0)
-            currentPath.1.updatePath(newPath: newPath)
+            let newPath = LeastSquaresPath.pathFromPoints(currentPath.dataPoints)
+            currentPath.path.updatePath(newPath: newPath)
             
         case .selection:
             self.selectEnd = currentPoint
@@ -141,11 +141,11 @@ class RenderView: UIView {
             guard var currentPath = currentPath else {
                 return
             }
-            currentPath.0.append(currentPoint)
+            currentPath.dataPoints.append(currentPoint)
             self.currentPath = currentPath
             // Update bezier path to fit new data
-            let newPath = LeastSquaresPath.pathFromPoints(currentPath.0)
-            currentPath.1.updatePath(newPath: newPath)
+            let newPath = LeastSquaresPath.pathFromPoints(currentPath.dataPoints)
+            currentPath.path.updatePath(newPath: newPath)
             
             self.finishPath()
         case .selection:
@@ -171,6 +171,7 @@ class RenderView: UIView {
     }
     
     private func finishRemove() {
+        #warning("Implement")
         self.removePoint = nil
     }
     
