@@ -35,6 +35,10 @@ class CanvasState: ObservableObject {
     @Published var isShowingPenColorPicker: Bool = false
     @Published var isShowingSelectionColorPicker: Bool = false
     
+    var isShowingPopover: Bool {
+        isShowingPenColorPicker || isShowingSelectionColorPicker
+    }
+    
     var selectedPaths: [PhotoDrawPath] {
         return selection ?? []
     }

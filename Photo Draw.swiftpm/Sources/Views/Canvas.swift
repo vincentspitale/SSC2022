@@ -93,6 +93,8 @@ class RenderView: UIView {
         switch self.state.currentTool {
         case .pen:
             self.finishPath()
+            // Don't start a new path if there are popovers
+            guard !state.isShowingPopover else { return }
             // Start a new path
             let path = PhotoDrawPath(path: Path(components: []), semanticColor: state.currentColor)
             state.paths.append(path)
