@@ -15,7 +15,7 @@ enum WelcomeState {
 }
 
 struct WelcomeView: View {
-    @Binding var isContinued: Bool
+    @ObservedObject var windowState: CanvasState
     @State var welcomeState: WelcomeState = .welcomeMessage
     
     var body: some View {
@@ -29,7 +29,7 @@ struct WelcomeView: View {
                     LearnToolsView()
                         .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading).combined(with: .opacity)))
                 case .selectPhoto:
-                    SelectPhotoView()
+                    SelectPhotoView(windowState: windowState)
                         .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading).combined(with: .opacity)))
                 }
             }
@@ -121,9 +121,9 @@ struct WelcomeMessageView: View {
 struct WelcomeView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            WelcomeView(isContinued: .constant(false))
+            WelcomeView(windowState: CanvasState())
                 .previewInterfaceOrientation(.landscapeLeft)
-            WelcomeView(isContinued: .constant(false))
+            WelcomeView(windowState: CanvasState())
                 .preferredColorScheme(.dark)
                 .previewInterfaceOrientation(.landscapeLeft)
         }

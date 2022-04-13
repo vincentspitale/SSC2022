@@ -69,7 +69,7 @@ class ImagePathConverter {
         
         // Copy the point locations using the gpu.
         // This parallelizes detecting if a pixel should be added,
-        // dramatically improving perforamnce.
+        // making things much faster!
         
         // Create set of points from the buffer
         

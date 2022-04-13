@@ -124,6 +124,10 @@ class RenderView: UIView {
         case .selection:
             self.selectEnd = currentPoint
         case .remove:
+            let removeRect = CGRect(x: currentPoint.x - 5, y: currentPoint.y - 5, width: 10, height: 10)
+            for path in self.state.paths where path.path.intersectsOrContainedBy(rect: removeRect) {
+                pathsToBeDeleted.insert(path)
+            }
             self.removePoint = currentPoint
         default:
             break
@@ -171,13 +175,21 @@ class RenderView: UIView {
     }
     
     private func finishSelection() {
-        #warning("Implement")
+        if let selectRect = selectRect {
+            var selection = [PhotoDrawPath]()
+            for path in self.state.paths where path.path.intersectsOrContainedBy(rect: selectRect) {
+                selection.append(path)
+            }
+            if selection.count >= 1 {
+                self.state.selection = selection
+            }
+        }
         self.selectStart = nil
         self.selectEnd = nil
     }
     
     private func finishRemove() {
-        #warning("Implement")
+        self.state.removePaths(pathsToBeDeleted)
         self.removePoint = nil
     }
     
@@ -258,5 +270,13 @@ struct CanvasView: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
         
+    }
+}
+
+
+fileprivate extension BezierKit.Path {
+    func intersectsOrContainedBy(rect: CGRect) -> Bool {
+        let rectPath = BezierKit.Path(cgPath: CGPath(rect: rect, transform: nil))
+        return self.intersects(rectPath) || rectPath.contains(self)
     }
 }

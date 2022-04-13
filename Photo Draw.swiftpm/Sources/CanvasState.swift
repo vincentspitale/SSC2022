@@ -69,6 +69,10 @@ class CanvasState: ObservableObject {
         paths.removeAll(where: { selectionSet.contains($0) })
         self.selection = nil
     }
+    
+    func removePaths(_ removeSet: Set<PhotoDrawPath>) {
+        paths.removeAll(where: { removeSet.contains($0) })
+    }
 }
 
 enum CanvasTool: Equatable {

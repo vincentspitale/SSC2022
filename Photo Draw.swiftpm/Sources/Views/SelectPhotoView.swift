@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct SelectPhotoView: View {
+    @ObservedObject var windowState: CanvasState
+    
     var body: some View {
         VStack{
             Spacer().frame(height: 200)
@@ -16,7 +18,6 @@ struct SelectPhotoView: View {
             }
             VStack {
                 Spacer()
-                
                 VStack(alignment: .leading) {
                     Text("First select a photo").font(.title)
                         .bold()
@@ -40,6 +41,6 @@ struct SelectPhotoView: View {
 
 struct SelectPhotoView_Previews: PreviewProvider {
     static var previews: some View {
-        SelectPhotoView()
+        SelectPhotoView(windowState: CanvasState())
     }
 }
