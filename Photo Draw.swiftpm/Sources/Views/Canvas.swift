@@ -5,7 +5,6 @@
 //  Created by Vincent Spitale on 4/6/22.
 //
 
-import BezierKit
 import CoreGraphics
 import Combine
 import Foundation
@@ -95,7 +94,7 @@ class RenderView: UIView {
         case .pen:
             self.finishPath()
             // Start a new path
-            let path = PhotoDrawPath(path: BezierKit.Path(components: []), semanticColor: state.currentColor)
+            let path = PhotoDrawPath(path: Path(components: []), semanticColor: state.currentColor)
             state.paths.append(path)
             currentPath = ([currentPoint], path)
         case .selection:
@@ -274,10 +273,10 @@ struct CanvasView: UIViewControllerRepresentable {
 }
 
 
-fileprivate extension BezierKit.Path {
+fileprivate extension Path {
     // Determine if this path should be selected by a selection area
     func intersectsOrContainedBy(rect: CGRect) -> Bool {
-        let rectPath = BezierKit.Path(cgPath: CGPath(rect: rect, transform: nil))
+        let rectPath = Path(cgPath: CGPath(rect: rect, transform: nil))
         return self.intersects(rectPath) || rectPath.contains(self)
     }
 }

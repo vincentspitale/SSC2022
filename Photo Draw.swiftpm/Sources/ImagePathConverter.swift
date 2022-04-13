@@ -7,7 +7,6 @@
 
 import Foundation
 import UIKit
-import BezierKit
 import SwiftUI
 
 fileprivate struct Point: Hashable {
@@ -35,7 +34,7 @@ class ImagePathConverter {
         self.image = image
     }
     
-    func findPaths() -> [(BezierKit.Path, UIColor)] {
+    func findPaths() -> [(Path, UIColor)] {
         let centerLinePaths = self.findCenterLinePaths()
         // Paths converted to bezier curves by least squares
         return centerLinePaths.map { path in

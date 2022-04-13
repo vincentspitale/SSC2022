@@ -34,17 +34,9 @@ let package = Package(
             ]
         )
     ],
-    dependencies: [
-        .package(url: "https://github.com/hfutrell/BezierKit.git", .exact("0.14.0")),
-        .package(url: "https://github.com/apple/swift-algorithms.git", "1.0.0"..<"2.0.0")
-    ],
     targets: [
         .executableTarget(
             name: "AppModule",
-            dependencies: [
-                .product(name: "BezierKit", package: "bezierkit"),
-                .product(name: "Algorithms", package: "swift-algorithms")
-            ],
             path: "."
         )
     ]

@@ -7,7 +7,6 @@
 
 import Foundation
 import Combine
-import BezierKit
 import UIKit
 import SwiftUI
 import simd
@@ -85,17 +84,17 @@ enum CanvasTool: Equatable {
 
 
 class PhotoDrawPath {
-    var path: BezierKit.Path
+    var path: Path
     var color: SemanticColor
     var transform: simd_float3x3
     
-    init(path: BezierKit.Path, color: UIColor) {
+    init(path: Path, color: UIColor) {
         self.path = path
         self.color = SemanticColor.colorToSemanticColor(color: color)
         self.transform = matrix_identity_float3x3
     }
     
-    init(path: BezierKit.Path, semanticColor: SemanticColor) {
+    init(path: Path, semanticColor: SemanticColor) {
         self.path = path
         self.color = semanticColor
         self.transform = matrix_identity_float3x3
@@ -106,7 +105,7 @@ class PhotoDrawPath {
     }
     
     // Allow the path to be modified with a new path to fit to the new point data
-    func updatePath(newPath: BezierKit.Path) {
+    func updatePath(newPath: Path) {
         self.path = newPath
     }
 }
