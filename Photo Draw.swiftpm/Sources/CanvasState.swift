@@ -57,6 +57,7 @@ class CanvasState: ObservableObject {
         for path in selection {
             path.color = newColor
         }
+        // Update the canvas with the new color
         objectWillChange.send()
     }
     

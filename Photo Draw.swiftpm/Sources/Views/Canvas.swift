@@ -7,6 +7,7 @@
 
 import BezierKit
 import CoreGraphics
+import Combine
 import Foundation
 import UIKit
 import SwiftUI
@@ -62,6 +63,8 @@ class RenderView: UIView {
     var removePoint: CGPoint? = nil
     var pathsToBeDeleted = Set<PhotoDrawPath>()
     
+    private var cancellable: AnyCancellable? = nil
+    
     var selectRect: CGRect? {
         guard let selectStart = selectStart, let selectEnd = selectEnd else {
             return nil
@@ -74,6 +77,9 @@ class RenderView: UIView {
         self.state = state
         super.init(frame: frame)
         self.backgroundColor = .clear
+        self.cancellable = state.objectWillChange.sink(receiveValue: { [weak self] _ in
+                self?.setNeedsDisplay()
+            })
     }
     
     @available(*, unavailable)

@@ -109,7 +109,7 @@ class ImagePathConverter {
 }
 
 fileprivate extension UIImage {
-    // Use core graphics to quickly fill a buffer with pixel data the cpu can access
+    // Use core graphics to quickly fill an array with pixel data the cpu can access
     func rgbaPixelData() -> [UInt8]? {
         let size = self.size
         var pixelData = [UInt8](repeating: 0, count: Int(size.width * size.height * 4))
@@ -124,9 +124,12 @@ fileprivate extension UIImage {
 }
 
 fileprivate class CovarianceKernel {
-    let image: UIImage
-    //let imageTexture: MTLTexture
-    //let outputTexture: MTLTexture
+    private let image: UIImage
+    
+    //private let imageTexture: MTLTexture
+    //private let outputTexture: MTLTexture
+    //private let device: MTLDevice
+    
     
     init(image: UIImage) {
         self.image = image
