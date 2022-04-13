@@ -1,5 +1,5 @@
 //
-//  File.swift
+//  CanvasState.swift
 //  Photo Draw
 //
 //  Created by Vincent Spitale on 4/6/22.
