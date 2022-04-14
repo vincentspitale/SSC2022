@@ -1,9 +1,12 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State var isShowingWelcome: Bool = false
     // Each window scene has its own canvas
     @StateObject var windowState = CanvasState()
+    
+    var isShowingWelcome: Bool {
+        windowState.photoMode == .welcome
+    }
     
     var body: some View {
         ZStack{

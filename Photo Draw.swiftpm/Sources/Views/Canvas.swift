@@ -127,16 +127,14 @@ class RenderView: UIView {
         case .selection:
             self.selectEnd = currentPoint
         case .remove:
-            guard var removePathPoints = removePathPoints else {
-                return
-            }
+            self.removePoint = currentPoint
+            guard var removePathPoints = removePathPoints else { return }
             removePathPoints.append(currentPoint)
             let removePath = LeastSquaresPath.pathFromPoints(removePathPoints)
             let removeRect = CGRect(x: currentPoint.x - 5, y: currentPoint.y - 5, width: 10, height: 10)
-            for path in self.state.paths where path.path.intersectsOrContainedBy(rect: removeRect) || path.path.intersects(removePath) {
+            for path in self.state.paths where path.path.intersectsOrContainedBy(rect: removeRect) || removePath.intersects(path.path) {
                 pathsToBeDeleted.insert(path)
             }
-            self.removePoint = currentPoint
         default:
             break
         }

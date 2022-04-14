@@ -34,6 +34,7 @@ class CanvasState: ObservableObject {
     }
     @Published var isShowingPenColorPicker: Bool = false
     @Published var isShowingSelectionColorPicker: Bool = false
+    @Published var photoMode: PhotoMode = .welcome
     
     var isShowingPopover: Bool {
         isShowingPenColorPicker || isShowingSelectionColorPicker
@@ -84,6 +85,15 @@ enum CanvasTool: Equatable {
     case remove
     case selection
     case placePhoto
+}
+
+
+enum PhotoMode {
+    case welcome
+    case none
+    case cameraScan
+    case library
+    case example
 }
 
 
