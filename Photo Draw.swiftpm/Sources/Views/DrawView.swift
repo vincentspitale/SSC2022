@@ -61,7 +61,7 @@ struct DrawView: View {
                             }
                             .accessibilityLabel("Select")
                             .accessibility(addTraits: self.windowState.currentTool == .selection ? .isSelected : [])
-                            if windowState.selection != nil {
+                            if let _ = windowState.selection {
                                 Spacer()
                                 self.selectionControls()
                             }
