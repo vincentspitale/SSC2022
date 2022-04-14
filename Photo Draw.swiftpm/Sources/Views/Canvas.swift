@@ -60,6 +60,7 @@ class RenderView: UIView {
     var currentPath: (dataPoints: [CGPoint], path: PhotoDrawPath)? = nil
     
     var removePoint: CGPoint? = nil
+    var removePathPoints: [CGPoint]? = nil
     var pathsToBeDeleted = Set<PhotoDrawPath>()
     
     private var cancellable: AnyCancellable? = nil
@@ -103,6 +104,7 @@ class RenderView: UIView {
             self.selectStart = currentPoint
         case .remove:
             self.removePoint = currentPoint
+            self.removePathPoints = [currentPoint]
         default:
             break
         }
@@ -125,8 +127,13 @@ class RenderView: UIView {
         case .selection:
             self.selectEnd = currentPoint
         case .remove:
+            guard var removePathPoints = removePathPoints else {
+                return
+            }
+            removePathPoints.append(currentPoint)
+            let removePath = LeastSquaresPath.pathFromPoints(removePathPoints)
             let removeRect = CGRect(x: currentPoint.x - 5, y: currentPoint.y - 5, width: 10, height: 10)
-            for path in self.state.paths where path.path.intersectsOrContainedBy(rect: removeRect) {
+            for path in self.state.paths where path.path.intersectsOrContainedBy(rect: removeRect) || path.path.intersects(removePath) {
                 pathsToBeDeleted.insert(path)
             }
             self.removePoint = currentPoint
@@ -192,6 +199,7 @@ class RenderView: UIView {
     private func finishRemove() {
         self.state.removePaths(pathsToBeDeleted)
         self.removePoint = nil
+        self.removePathPoints = nil
     }
     
     override func draw(_ rect: CGRect) {

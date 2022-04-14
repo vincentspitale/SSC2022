@@ -12,7 +12,7 @@ struct SelectPhotoView: View {
     
     var body: some View {
         VStack{
-            Spacer().frame(height: 200)
+            Spacer().frame(height: 100)
             HStack{
                 Spacer()
             }
