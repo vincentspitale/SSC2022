@@ -63,24 +63,25 @@ class RenderView: UIView {
     private var canvasTranslateStart: CGPoint?
     private var canvasTranslateEnd: CGPoint?
     
-    private var canvasTranslation: (x: CGFloat, y: CGFloat)? {
+    private var canvasTranslation: CGAffineTransform? {
         guard let translateStart = canvasTranslateStart, let translateEnd = canvasTranslateEnd else {
             return nil
         }
-        return (translateEnd.x - translateStart.x, translateEnd.y - translateStart.y)
+        return CGAffineTransform.identity.translatedBy(x: translateEnd.x - translateStart.x, y: translateEnd.y - translateStart.y)
     }
     
     // Move selected paths
     private var selectTranslateStart: CGPoint?
     private var selectTranslateEnd: CGPoint?
     
-    private var selectTranslation: (x: CGFloat, y: CGFloat)? {
+    private var selectTranslation: CGAffineTransform? {
         guard let translateStart = selectTranslateStart, let translateEnd = selectTranslateEnd else {
             return nil
         }
-        return (translateEnd.x - translateStart.x, translateEnd.y - translateStart.y)
+        return CGAffineTransform.identity.translatedBy(x: translateEnd.x - translateStart.x, y: translateEnd.y - translateStart.y)
     }
     
+    // Path that is currently being drawn
     private var currentPath: (dataPoints: [CGPoint], path: PhotoDrawPath)? = nil
     
     private var removePoint: CGPoint? = nil
@@ -164,7 +165,7 @@ class RenderView: UIView {
                 guard let selection = state.selection, let translation = selectTranslation else { return }
                 // Update the translation for the selection
                 for path in selection {
-                    path.translate(x: translation.x, y: translation.y, commitTransform: false)
+                    path.transform(translation, commitTransform: false)
                 }
             } else {
                 self.selectEnd = currentPoint
@@ -215,7 +216,7 @@ class RenderView: UIView {
                 guard let selection = state.selection, let translation = selectTranslation else { return }
                 // Update the translation for the selection
                 for path in selection {
-                    path.translate(x: translation.x, y: translation.y, commitTransform: true)
+                    path.transform(translation, commitTransform: true)
                 }
                 self.selectTranslateStart = nil
                 self.selectTranslateEnd = nil
@@ -262,7 +263,7 @@ class RenderView: UIView {
         guard let canvasTranslation = canvasTranslation else {
             return
         }
-        self.canvasTransform = self.canvasTransform.translatedBy(x: canvasTranslation.x, y: canvasTranslation.y)
+        self.canvasTransform = self.canvasTransform.concatenating(canvasTranslation)
         self.canvasTranslateStart = nil
         self.canvasTranslateEnd = nil
     }
@@ -275,8 +276,7 @@ class RenderView: UIView {
         // Apply transformation
         context?.concatenate(canvasTransform)
         if let canvasTranslation = canvasTranslation {
-            let translation = CGAffineTransform.identity.translatedBy(x: canvasTranslation.x, y: canvasTranslation.y)
-            context?.concatenate(translation)
+            context?.concatenate(canvasTranslation)
         }
         
         // Draw selection

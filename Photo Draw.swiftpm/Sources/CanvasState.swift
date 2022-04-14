@@ -118,11 +118,10 @@ class PhotoDrawPath {
         self.transform = .identity
     }
     
-    func translate(x: CGFloat, y: CGFloat, commitTransform: Bool) {
-        let transform = CGAffineTransform.identity.translatedBy(x: x, y: y)
-        self.transform = transform
+    func transform(_ newTransform: CGAffineTransform, commitTransform: Bool) {
+        self.transform = newTransform
         if commitTransform {
-            self.path = self.path.copy(using: transform)
+            self.path = self.path.copy(using: newTransform)
             self.transform = .identity
         }
     }
