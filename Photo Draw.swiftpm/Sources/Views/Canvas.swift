@@ -53,29 +53,43 @@ class Canvas: UIViewController {
 }
 
 class RenderView: UIView {
-    var state: CanvasState
-    var selectStart: CGPoint?
-    var selectEnd: CGPoint?
+    private var state: CanvasState
+    private var selectStart: CGPoint?
+    private var selectEnd: CGPoint?
     
-    var translateStart: CGPoint?
-    var translateEnd: CGPoint?
+    // Move canvas
+    private var canvasTransform: CGAffineTransform = .identity
     
-    var translation: (x: CGFloat, y: CGFloat)? {
-        guard let translateStart = translateStart, let translateEnd = translateEnd else {
+    private var canvasTranslateStart: CGPoint?
+    private var canvasTranslateEnd: CGPoint?
+    
+    private var canvasTranslation: (x: CGFloat, y: CGFloat)? {
+        guard let translateStart = canvasTranslateStart, let translateEnd = canvasTranslateEnd else {
             return nil
         }
         return (translateEnd.x - translateStart.x, translateEnd.y - translateStart.y)
     }
     
-    var currentPath: (dataPoints: [CGPoint], path: PhotoDrawPath)? = nil
+    // Move selected paths
+    private var selectTranslateStart: CGPoint?
+    private var selectTranslateEnd: CGPoint?
     
-    var removePoint: CGPoint? = nil
-    var removePathPoints: [CGPoint]? = nil
-    var pathsToBeDeleted = Set<PhotoDrawPath>()
+    private var selectTranslation: (x: CGFloat, y: CGFloat)? {
+        guard let translateStart = selectTranslateStart, let translateEnd = selectTranslateEnd else {
+            return nil
+        }
+        return (translateEnd.x - translateStart.x, translateEnd.y - translateStart.y)
+    }
+    
+    private var currentPath: (dataPoints: [CGPoint], path: PhotoDrawPath)? = nil
+    
+    private var removePoint: CGPoint? = nil
+    private var removePathPoints: [CGPoint]? = nil
+    private var pathsToBeDeleted = Set<PhotoDrawPath>()
     
     private var cancellable: AnyCancellable? = nil
     
-    var selectRect: CGRect? {
+    private var selectRect: CGRect? {
         guard let selectStart = selectStart, let selectEnd = selectEnd else {
             return nil
         }
@@ -98,9 +112,13 @@ class RenderView: UIView {
     }
     
     
+    private func translatedPoint(_ point: CGPoint) -> CGPoint {
+        return point.applying(canvasTransform.inverted())
+    }
+    
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first, event?.allTouches?.count == 1 else { return }
-        let currentPoint = touch.location(in: self)
+        let currentPoint = translatedPoint(touch.location(in: self))
         switch self.state.currentTool {
         case .pen:
             self.finishPath()
@@ -112,13 +130,15 @@ class RenderView: UIView {
             currentPath = ([currentPoint], path)
         case .selection:
             if state.hasSelection {
-                self.translateStart = currentPoint
+                self.selectTranslateStart = currentPoint
             } else {
                 self.selectStart = currentPoint
             }
         case .remove:
             self.removePoint = currentPoint
             self.removePathPoints = [currentPoint]
+        case .touch:
+            self.canvasTranslateStart = currentPoint
         default:
             break
         }
@@ -126,7 +146,7 @@ class RenderView: UIView {
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first, event?.allTouches?.count == 1 else { return }
-        let currentPoint = touch.location(in: self)
+        let currentPoint = translatedPoint(touch.location(in: self))
         switch self.state.currentTool {
         case .pen:
             guard var currentPath = currentPath else {
@@ -140,8 +160,9 @@ class RenderView: UIView {
             
         case .selection:
             if state.hasSelection {
-                self.translateEnd = currentPoint
-                guard let selection = state.selection, let translation = translation else { return }
+                self.selectTranslateEnd = currentPoint
+                guard let selection = state.selection, let translation = selectTranslation else { return }
+                // Update the translation for the selection
                 for path in selection {
                     path.translate(x: translation.x, y: translation.y, commitTransform: false)
                 }
@@ -157,6 +178,8 @@ class RenderView: UIView {
             for path in self.state.paths where path.path.intersectsOrContainedBy(rect: removeRect) || removePath.intersects(path.path) {
                 pathsToBeDeleted.insert(path)
             }
+        case .touch:
+            self.canvasTranslateEnd = currentPoint
         default:
             break
         }
@@ -173,7 +196,7 @@ class RenderView: UIView {
     
     private func handleTouchStop(_ touches: Set<UITouch>) {
         guard let touch = touches.first else { return }
-        let currentPoint = touch.location(in: self)
+        let currentPoint = translatedPoint(touch.location(in: self))
         switch self.state.currentTool {
         case .pen:
             guard var currentPath = currentPath else {
@@ -188,19 +211,22 @@ class RenderView: UIView {
             self.finishPath()
         case .selection:
             if state.hasSelection {
-                self.translateEnd = currentPoint
-                guard let selection = state.selection, let translation = translation else { return }
+                self.selectTranslateEnd = currentPoint
+                guard let selection = state.selection, let translation = selectTranslation else { return }
+                // Update the translation for the selection
                 for path in selection {
                     path.translate(x: translation.x, y: translation.y, commitTransform: true)
                 }
-                self.translateStart = nil
-                self.translateEnd = nil
+                self.selectTranslateStart = nil
+                self.selectTranslateEnd = nil
             } else {
                 self.selectEnd = currentPoint
                 self.finishSelection()
             }
         case .remove:
             self.finishRemove()
+        case .touch:
+            self.finishCanvasTranslate()
         default:
             break
         }
@@ -232,10 +258,26 @@ class RenderView: UIView {
         self.removePathPoints = nil
     }
     
+    private func finishCanvasTranslate() {
+        guard let canvasTranslation = canvasTranslation else {
+            return
+        }
+        self.canvasTransform = self.canvasTransform.translatedBy(x: canvasTranslation.x, y: canvasTranslation.y)
+        self.canvasTranslateStart = nil
+        self.canvasTranslateEnd = nil
+    }
+    
     override func draw(_ rect: CGRect) {
         let context = UIGraphicsGetCurrentContext()
         context?.setLineCap(.round)
         context?.setShouldAntialias(true)
+        
+        // Apply transformation
+        context?.concatenate(canvasTransform)
+        if let canvasTranslation = canvasTranslation {
+            let translation = CGAffineTransform.identity.translatedBy(x: canvasTranslation.x, y: canvasTranslation.y)
+            context?.concatenate(translation)
+        }
         
         // Draw selection
         if let selectRect = selectRect {
@@ -265,7 +307,12 @@ class RenderView: UIView {
                 context?.setFillColor(AppColors.accent.cgColor)
                 context?.setStrokeColor(AppColors.accent.cgColor)
                 context?.setLineWidth(5)
-                context?.addPath(path.path.cgPath.copy(dashingWithPhase: 0, lengths: [], transform: path.transform))
+                // Apply in-progress transform
+                if let pathTransform = path.transform {
+                    context?.addPath(path.path.cgPath.copy(dashingWithPhase: 0, lengths: [], transform: pathTransform))
+                } else {
+                    context?.addPath(path.path.cgPath)
+                }
                 context?.drawPath(using: .fillStroke)
                 context?.strokePath()
             }
@@ -277,7 +324,12 @@ class RenderView: UIView {
             context?.setFillColor(color)
             context?.setStrokeColor(color)
             context?.setLineWidth(2)
-            context?.addPath(path.path.cgPath.copy(dashingWithPhase: 0, lengths: [], transform: path.transform))
+            // Apply in-progress transform
+            if let pathTransform = path.transform {
+                context?.addPath(path.path.cgPath.copy(dashingWithPhase: 0, lengths: [], transform: pathTransform))
+            } else {
+                context?.addPath(path.path.cgPath)
+            }
             context?.drawPath(using: .fillStroke)
             context?.strokePath()
             

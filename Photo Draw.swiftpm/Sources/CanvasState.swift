@@ -104,7 +104,7 @@ enum PhotoMode {
 class PhotoDrawPath {
     var path: Path
     var color: SemanticColor
-    var transform: CGAffineTransform
+    var transform: CGAffineTransform?
     
     init(path: Path, color: UIColor) {
         self.path = path
@@ -119,7 +119,8 @@ class PhotoDrawPath {
     }
     
     func translate(x: CGFloat, y: CGFloat, commitTransform: Bool) {
-        self.transform = CGAffineTransform.identity.translatedBy(x: x, y: y)
+        let transform = CGAffineTransform.identity.translatedBy(x: x, y: y)
+        self.transform = transform
         if commitTransform {
             self.path = self.path.copy(using: transform)
             self.transform = .identity
