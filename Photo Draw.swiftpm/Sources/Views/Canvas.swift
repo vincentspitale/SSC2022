@@ -57,6 +57,16 @@ class RenderView: UIView {
     var selectStart: CGPoint?
     var selectEnd: CGPoint?
     
+    var translateStart: CGPoint?
+    var translateEnd: CGPoint?
+    
+    var translation: (x: CGFloat, y: CGFloat)? {
+        guard let translateStart = translateStart, let translateEnd = translateEnd else {
+            return nil
+        }
+        return (translateEnd.x - translateStart.x, translateEnd.y - translateStart.y)
+    }
+    
     var currentPath: (dataPoints: [CGPoint], path: PhotoDrawPath)? = nil
     
     var removePoint: CGPoint? = nil
@@ -78,8 +88,8 @@ class RenderView: UIView {
         super.init(frame: frame)
         self.backgroundColor = .clear
         self.cancellable = state.objectWillChange.sink(receiveValue: { [weak self] _ in
-                self?.setNeedsDisplay()
-            })
+            self?.setNeedsDisplay()
+        })
     }
     
     @available(*, unavailable)
@@ -101,7 +111,11 @@ class RenderView: UIView {
             state.paths.append(path)
             currentPath = ([currentPoint], path)
         case .selection:
-            self.selectStart = currentPoint
+            if state.hasSelection {
+                self.translateStart = currentPoint
+            } else {
+                self.selectStart = currentPoint
+            }
         case .remove:
             self.removePoint = currentPoint
             self.removePathPoints = [currentPoint]
@@ -109,7 +123,7 @@ class RenderView: UIView {
             break
         }
     }
-        
+    
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first, event?.allTouches?.count == 1 else { return }
         let currentPoint = touch.location(in: self)
@@ -125,7 +139,15 @@ class RenderView: UIView {
             currentPath.path.updatePath(newPath: newPath)
             
         case .selection:
-            self.selectEnd = currentPoint
+            if state.hasSelection {
+                self.translateEnd = currentPoint
+                guard let selection = state.selection, let translation = translation else { return }
+                for path in selection {
+                    path.translate(x: translation.x, y: translation.y, commitTransform: false)
+                }
+            } else {
+                self.selectEnd = currentPoint
+            }
         case .remove:
             self.removePoint = currentPoint
             guard var removePathPoints = removePathPoints else { return }
@@ -140,7 +162,7 @@ class RenderView: UIView {
         }
         self.setNeedsDisplay()
     }
-        
+    
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         self.handleTouchStop(touches)
     }
@@ -165,8 +187,18 @@ class RenderView: UIView {
             
             self.finishPath()
         case .selection:
-            self.selectEnd = currentPoint
-            self.finishSelection()
+            if state.hasSelection {
+                self.translateEnd = currentPoint
+                guard let selection = state.selection, let translation = translation else { return }
+                for path in selection {
+                    path.translate(x: translation.x, y: translation.y, commitTransform: true)
+                }
+                self.translateStart = nil
+                self.translateEnd = nil
+            } else {
+                self.selectEnd = currentPoint
+                self.finishSelection()
+            }
         case .remove:
             self.finishRemove()
         default:
@@ -233,10 +265,11 @@ class RenderView: UIView {
                 context?.setFillColor(AppColors.accent.cgColor)
                 context?.setStrokeColor(AppColors.accent.cgColor)
                 context?.setLineWidth(5)
-                context?.addPath(path.path.cgPath)
+                context?.addPath(path.path.cgPath.copy(dashingWithPhase: 0, lengths: [], transform: path.transform))
                 context?.drawPath(using: .fillStroke)
                 context?.strokePath()
             }
+            
             
             // Paths that have been touched by the remove tool should have lower opacity
             let color = pathsToBeDeleted.contains(path) ? path.color.color.withAlphaComponent(0.3).cgColor : path.color.color.cgColor
@@ -244,9 +277,10 @@ class RenderView: UIView {
             context?.setFillColor(color)
             context?.setStrokeColor(color)
             context?.setLineWidth(2)
-            context?.addPath(path.path.cgPath)
+            context?.addPath(path.path.cgPath.copy(dashingWithPhase: 0, lengths: [], transform: path.transform))
             context?.drawPath(using: .fillStroke)
             context?.strokePath()
+            
         }
     }
     
@@ -263,7 +297,7 @@ class AppColors {
                 return lightMode
             }
         }
-     return UIColor(dynamicProvider: provider)
+        return UIColor(dynamicProvider: provider)
     }()
     
 }

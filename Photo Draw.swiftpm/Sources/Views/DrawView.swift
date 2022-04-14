@@ -25,6 +25,15 @@ struct DrawView: View {
         return Array(zip(colors.indices, colors))
     }
     
+    var hasSelection: Bool {
+        windowState.selection != nil
+    }
+    
+    // Give adequate space to 3 vs 5 tools
+    var toolWidth: CGFloat {
+        hasSelection ? 250 : 400
+    }
+    
     var body: some View {
         ZStack{
             Rectangle()
@@ -50,7 +59,7 @@ struct DrawView: View {
                     HStack {
                         Spacer()
                         if windowState.currentTool != .placePhoto {
-                            if windowState.selection == nil {
+                            if !hasSelection {
                                 self.controls()
                             }
                             Button(action: {selectionAction()}) {
@@ -61,7 +70,7 @@ struct DrawView: View {
                             }
                             .accessibilityLabel("Select")
                             .accessibility(addTraits: self.windowState.currentTool == .selection ? .isSelected : [])
-                            if let _ = windowState.selection {
+                            if hasSelection {
                                 Spacer()
                                 self.selectionControls()
                             }
@@ -82,7 +91,7 @@ struct DrawView: View {
                         Spacer()
                     }
                 }
-                .frame(minWidth: nil, idealWidth: 400, maxWidth: 400, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
+                .frame(minWidth: nil, idealWidth: toolWidth, maxWidth: toolWidth, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
                 .zIndex(1)
                 .padding(.horizontal)
                 if horizontalSizeClass != .compact {
@@ -133,18 +142,18 @@ struct DrawView: View {
         Spacer()
         Menu {
             Button(action: {
-#warning("Implement")
+                self.windowState.photoMode = .cameraScan
             }) {
                 Label("Camera Scan", systemImage: "viewfinder")
             }
             Button(action: {
-#warning("Implement")
+                self.windowState.photoMode = .library
             }) {
                 Label("Photo Library", systemImage: "photo.fill")
             }
             
             Button(action: {
-#warning("Implement")
+                self.windowState.photoMode = .example
             }) {
                 Label("Example Photos", systemImage: "photo.on.rectangle.angled")
             }

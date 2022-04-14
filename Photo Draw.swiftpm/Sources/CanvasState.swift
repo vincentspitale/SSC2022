@@ -36,6 +36,10 @@ class CanvasState: ObservableObject {
     @Published var isShowingSelectionColorPicker: Bool = false
     @Published var photoMode: PhotoMode = .welcome
     
+    var hasSelection: Bool {
+        self.selection != nil
+    }
+    
     var isShowingPopover: Bool {
         isShowingPenColorPicker || isShowingSelectionColorPicker
     }
@@ -71,7 +75,7 @@ class CanvasState: ObservableObject {
         }
         let selectionSet = Set<PhotoDrawPath>(selectedPaths)
         paths.removeAll(where: { selectionSet.contains($0) })
-        self.selection = nil
+        withAnimation { self.selection = nil }
     }
     
     func removePaths(_ removeSet: Set<PhotoDrawPath>) {
@@ -100,28 +104,33 @@ enum PhotoMode {
 class PhotoDrawPath {
     var path: Path
     var color: SemanticColor
-    var transform: simd_float3x3
+    var transform: CGAffineTransform
     
     init(path: Path, color: UIColor) {
         self.path = path
         self.color = SemanticColor.colorToSemanticColor(color: color)
-        self.transform = matrix_identity_float3x3
+        self.transform = .identity
     }
     
     init(path: Path, semanticColor: SemanticColor) {
         self.path = path
         self.color = semanticColor
-        self.transform = matrix_identity_float3x3
+        self.transform = .identity
     }
     
-    func resize(transform: simd_float3x3) {
-        self.transform *= transform
+    func translate(x: CGFloat, y: CGFloat, commitTransform: Bool) {
+        self.transform = CGAffineTransform.identity.translatedBy(x: x, y: y)
+        if commitTransform {
+            self.path = self.path.copy(using: transform)
+            self.transform = .identity
+        }
     }
     
     // Allow the path to be modified with a new path to fit to the new point data
     func updatePath(newPath: Path) {
         self.path = newPath
     }
+
 }
 
 extension PhotoDrawPath: Equatable, Hashable {
