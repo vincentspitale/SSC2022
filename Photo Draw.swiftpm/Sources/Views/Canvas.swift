@@ -309,12 +309,15 @@ class RenderView: UIView {
                 context?.setLineWidth(5)
                 // Apply in-progress transform
                 if let pathTransform = path.transform {
-                    context?.addPath(path.path.cgPath.copy(dashingWithPhase: 0, lengths: [], transform: pathTransform))
-                } else {
-                    context?.addPath(path.path.cgPath)
+                    context?.concatenate(pathTransform)
                 }
+                context?.addPath(path.path.cgPath)
                 context?.drawPath(using: .fillStroke)
                 context?.strokePath()
+                // Undo in-progress transform
+                if let pathTransform = path.transform {
+                    context?.concatenate(pathTransform.inverted())
+                }
             }
             
             
@@ -326,12 +329,16 @@ class RenderView: UIView {
             context?.setLineWidth(2)
             // Apply in-progress transform
             if let pathTransform = path.transform {
-                context?.addPath(path.path.cgPath.copy(dashingWithPhase: 0, lengths: [], transform: pathTransform))
-            } else {
-                context?.addPath(path.path.cgPath)
+                context?.concatenate(pathTransform)
             }
+            context?.addPath(path.path.cgPath)
             context?.drawPath(using: .fillStroke)
             context?.strokePath()
+            
+            // Undo in-progress transform
+            if let pathTransform = path.transform {
+                context?.concatenate(pathTransform.inverted())
+            }
             
         }
     }

@@ -7,7 +7,6 @@
 
 import Foundation
 import UIKit
-import SwiftUI
 
 fileprivate struct Point: Hashable {
     let x,y: Int
