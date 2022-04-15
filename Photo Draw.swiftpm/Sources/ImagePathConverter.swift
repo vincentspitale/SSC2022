@@ -83,6 +83,8 @@ class ImagePathConverter {
         return []
     }
     
+    
+    
     private func averageColor(path: [Point]) -> UIColor {
         let numSamplePoints = min(10, path.count)
         var sampleIndices = [Int]()

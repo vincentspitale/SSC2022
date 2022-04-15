@@ -233,3 +233,27 @@ enum SemanticColor: CaseIterable, Comparable {
     }
     
 }
+
+class ImageConversion {
+    let image: UIImage
+    private var paths: [PhotoDrawPath]?
+    
+    private var scale: CGFloat = 1.0
+    
+    var isConversionFinished: Bool {
+        paths != nil
+    }
+    
+    init(image: UIImage) {
+        self.image = image
+    }
+    
+    func convert() {
+        Task {
+            let convertedPaths = ImagePathConverter(image: image).findPaths()
+            self.paths = convertedPaths.map { (path, color) -> PhotoDrawPath in
+                return PhotoDrawPath(path: path, color: color)
+            }
+        }
+    }
+}

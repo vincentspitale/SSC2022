@@ -54,8 +54,6 @@ class Canvas: UIViewController {
 
 class RenderView: UIView {
     private var state: CanvasState
-    private var selectStart: CGPoint?
-    private var selectEnd: CGPoint?
     
     // Move canvas
     private var canvasTransform: CGAffineTransform = .identity
@@ -90,6 +88,9 @@ class RenderView: UIView {
     
     private var cancellable: AnyCancellable? = nil
     
+    // Create a path selection
+    private var selectStart: CGPoint?
+    private var selectEnd: CGPoint?
     private var selectRect: CGRect? {
         guard let selectStart = selectStart, let selectEnd = selectEnd else {
             return nil
