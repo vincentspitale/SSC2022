@@ -2,8 +2,16 @@
 
 My app for the 2022 Swift Student Challenge.
 
-'Photo Draw' is a neat little drawing app with an amazing trick up its sleeve. It allows you to convert images with handwriting or line drawings to vector paths. These paths can then be manipulated exactly like they were drawn directly on your device. It's perfect for those who prefer the feel of paper or students who want to digitize what's on the board!
+'Photo Draw' is a neat little drawing app with an amazing trick up its sleeve. It allows you to convert images with handwriting or line drawings to vector paths. These paths can then be manipulated exactly like they were drawn directly on your device. It's perfect for those who prefer the feel of paper or students who want to digitize what's on the board in the classroom!
 
-The app uses the open source library 'BezierKit' by Holmes Futrell to represent vector paths. This code allows the app to detect intersections between paths. It also provides a great interface for creating paths that does not exist in other Apple frameworks. Paths that are created in 'BezierKit' can easily be coverted to CGPaths to be rendered using Core Graphics.
+## Why?
+
+
+
+### Disclaimers
+
+The app uses the open source library 'BezierKit' by Holmes Futrell to represent vector paths. This code allows the app to detect intersections between paths which is used for selection and deletion. It also provides a great interface for creating paths that does not exist in other Apple frameworks. Paths that are created in 'BezierKit' can easily be coverted to CGPaths to be rendered using Core Graphics.
+
+The image path finding algorithm I implemented uses the process outlined in the paper [A complete hand-drawn sketch vectorization framework](https://arxiv.org/pdf/1802.05902.pdf).
 
 **This app was tested with Xcode 13.3 and should be compiled using Xcode rather than Swift Playgrounds 4.**

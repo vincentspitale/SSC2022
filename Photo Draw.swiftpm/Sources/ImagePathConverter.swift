@@ -12,6 +12,7 @@ fileprivate struct Point: Hashable {
     let x,y: Int
 }
 
+/// Converts an image to paths for vector drawing
 class ImagePathConverter {
     struct Pixel {
         let x, y: Int
@@ -33,7 +34,8 @@ class ImagePathConverter {
         self.image = image
     }
     
-    func findPaths() -> [(Path, UIColor)] {
+    /// Converts the provided image to paths with each path's average color
+    public func findPaths() -> [(Path, UIColor)] {
         let centerLinePaths = self.findCenterLinePaths()
         // Paths converted to bezier curves by least squares
         return centerLinePaths.map { path in

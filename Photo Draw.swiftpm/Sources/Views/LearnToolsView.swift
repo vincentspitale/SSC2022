@@ -13,7 +13,7 @@ struct LearnToolsView: View {
     }()
     
     let toolColumns = [
-        GridItem(.adaptive(minimum: 200))
+        GridItem(.adaptive(minimum: 150))
     ]
     
     var body: some View {
@@ -61,7 +61,7 @@ struct LearnToolsView: View {
                         }
                         .frame(width: 100)
                         .padding(.bottom, 20)
-                                Text("Draw")
+                                Text("Pen")
                                 .font(.title2).bold()
                                     .foregroundColor(.accentColor)
                                     .padding(.bottom, 3)
