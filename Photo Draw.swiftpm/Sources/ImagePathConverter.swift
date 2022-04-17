@@ -14,7 +14,8 @@ fileprivate struct Point: Hashable {
     let x,y: Int
 }
 
-/// Converts an image to paths for vector drawing
+/// Converts an image to paths for vector drawing using the process outlined by the paper
+/// "A complete hand-drawn sketch vectorization framework" by L. Donati, S. Cesano, and A. Prati.
 class ImagePathConverter {
     struct Pixel {
         let x, y: Int
@@ -80,7 +81,7 @@ class ImagePathConverter {
         // This parallelizes detecting if a pixel should be added,
         // making things much faster!
         
-        let strokePixels: [Point] = [Point]() // TO DO
+        let strokePixels: [Point] = [Point]() // TODO
         
         // Iterate through points to separate into groups with union-find
         var groupMap = [Point : Point]()
@@ -302,6 +303,13 @@ fileprivate class Connectivity {
     static let instance = Connectivity()
     private let queue = DispatchQueue(label: "connectivity", qos: .userInitiated, autoreleaseFrequency: .workItem, target: nil)
     
+    // These matrices are compared to a point's neighbors matrix. If any of these
+    // matrices match the neighbors matrix, that point is an edge pixel of a path.
+    //
+    // Reading matrix values:
+    // 0 means that there must not be a path pixel there.
+    // 1 means that there must be a path pixel there.
+    // -1 indicates that it does not matter if there is a path pixel there.
     private lazy var _edgeMasks: [simd_float3x3] = {
         let lastHorizontal: simd_float3x3 = {
             let col0 = simd_float3(0, 0, 0)
@@ -336,6 +344,14 @@ fileprivate class Connectivity {
         return [rot0, rot1, rot2, rot3]
     }
     
+    // These matrices are compared to a point's neighbors matrix. If any of these
+    // matrices match the neighbors matrix, that point is required to maintain path
+    // connectivity.
+    //
+    // Reading matrix values:
+    // 0 means that there must not be a path pixel there.
+    // 1 means that there must be a path pixel there.
+    // -1 indicates that it does not matter if there is a path pixel there.
     private lazy var _hitMissMasks: [simd_float3x3] = {
         var masks = [simd_float3x3]()
         
@@ -415,15 +431,47 @@ fileprivate class Connectivity {
     }
     
     private func isRequired(point: Point, group: Set<Point>) -> (simd_float3x3) -> Bool {
-        #warning("Implement")
+        let up = Point(x: point.x, y: point.y - 1)
+        let left = Point(x: point.x - 1, y: point.y)
+        let right = Point(x: point.x + 1, y: point.y)
+        let down = Point(x: point.x, y: point.y + 1)
+        let topLeft = Point(x: point.x - 1, y: point.y - 1)
+        let topRight = Point(x: point.x + 1, y: point.y - 1)
+        let bottomLeft = Point(x: point.x - 1, y: point.y + 1)
+        let bottomRight = Point(x: point.x + 1, y: point.y + 1)
+        
+        let col0 = [topLeft, left, bottomLeft].map { group.contains($0) }.map { $0 ? Int(1) : Int(0)}
+        let col1 = [up, point, down].map { group.contains($0) }.map { $0 ? Int(1) : Int(0)}
+        let col2 = [topRight, right, bottomRight].map { group.contains($0) }.map { $0 ? Int(1) : Int(0)}
+        let columns = [col0, col1, col2]
+        
+        // Closure compares a given matrix to the 3x3 grid of pixels surrounding a point
+        let isRequired: (simd_float3x3) -> Bool = { matrix in
+            let (hitCol0, hitCol1, hitCol2) = matrix.columns
+            let hitColumns = [hitCol0, hitCol1, hitCol2]
+            for (hit, col) in zip(hitColumns, columns) {
+                let (x, y, z) = (hit.x, hit.y, hit.z)
+                let hitArray = [Int(x), Int(y), Int(z)]
+                for (hitNum, colNum) in zip(hitArray, col) {
+                    guard hitNum >= 0 else { continue }
+                    if hitNum != colNum {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
+        return isRequired
     }
     
     func isEdge(point: Point, group: Set<Point>) -> Bool {
-        #warning("Implement")
+        let isRequired = self.isRequired(point: point, group: group)
+        return edgeMasks.contains { isRequired($0) }
     }
     
     func isRequiredForConnectivity(point: Point, group: Set<Point>) -> Bool {
-        #warning("Implement")
+        let isRequired = self.isRequired(point: point, group: group)
+        return hitMissMasks.contains { isRequired($0) }
     }
 }
 

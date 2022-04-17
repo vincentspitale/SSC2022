@@ -14,6 +14,7 @@ import simd
 class CanvasState: ObservableObject {
     // Strokes that are on the canvas
     @Published var paths = [PhotoDrawPath]()
+    // The color of the pen tool
     @Published var currentColor: SemanticColor = .primary
     @Published var currentTool: CanvasTool = .pen {
         willSet {
