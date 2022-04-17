@@ -8,22 +8,10 @@
 import Foundation
 import UIKit
 import SwiftUI
+import simd
 
 fileprivate struct Point: Hashable {
     let x,y: Int
-    
-    
-    private func isRequired(group: Set<Point>) -> (simd_float3x3) -> Bool {
-#warning("Implement")
-    }
-    
-    func isEdge(group: Set<Point>) -> Bool {
-        #warning("Implement")
-    }
-    
-    func isRequiredForConnectivity(group: Set<Point>) -> Bool {
-        #warning("Implement")
-    }
 }
 
 /// Converts an image to paths for vector drawing
@@ -181,7 +169,7 @@ class ImagePathConverter {
                 let currentBoundaries = updatedBoundaries
                 for boundary in currentBoundaries {
                     guard updatedBoundaries.contains(boundary) else { continue }
-                    if !boundary.isRequiredForConnectivity(group: updatedGroup) {
+                    if !Connectivity.instance.isRequiredForConnectivity(point: boundary, group: updatedGroup) {
                         didChange = true
                         
                         let up = Point(x: boundary.x, y: boundary.y - 1)
@@ -215,7 +203,7 @@ class ImagePathConverter {
         var paths = [[[Point]]](repeating: [], count: centerLines.count)
         DispatchQueue.concurrentPerform(iterations: centerLines.count) { index in
             let centerLineSet = centerLines[index]
-            guard let startingPoint = centerLineSet.min(by: { (lhs, rhs) in
+            guard let initialPoint = centerLineSet.min(by: { (lhs, rhs) in
                 return lhs.x + lhs.y < rhs.x + rhs.y
             }) else { return }
             
@@ -237,12 +225,12 @@ class ImagePathConverter {
                 }
             }
             
-            deque.addAtTail(startingPoint)
+            deque.addAtTail(initialPoint)
             var breadthVisited = Set<Point>()
-            breadthVisited.insert(startingPoint)
+            breadthVisited.insert(initialPoint)
             
             guard var currentPoint = deque.popFirst() else { return }
-            while !currentPoint.isEdge(group: centerLineSet) {
+            while !Connectivity.instance.isEdge(point: currentPoint, group: centerLineSet) {
                 let neighbors = findNeighbors(currentPoint).filter { !breadthVisited.contains($0) }
                 for neighbor in neighbors {
                     deque.addAtTail(neighbor)
@@ -251,14 +239,38 @@ class ImagePathConverter {
                 currentPoint = nextPoint
                 breadthVisited.insert(nextPoint)
             }
+            // We found the starting point!
+            // Now we have to search for paths from this point
+            let startingPoint = currentPoint
+            var depthVisited = Set<Point>()
+            var stack: [Point] = []
+            var currentDepth = startingPoint
+            var currentPath: [Point] = [startingPoint]
+            var centerLinePaths = [[Point]]()
             
-            
-        
+            // Break paths into strokes
+            while true {
+                let neighbors = findNeighbors(currentDepth)
+                stack.append(contentsOf: neighbors.filter { !depthVisited.contains($0) })
+                guard let nextPoint = stack.popLast() else { break }
+                // If there are more than two neighbors, we must split into two separate paths to have both paths be lines
+                if neighbors.contains(nextPoint) && neighbors.count < 3 {
+                    currentPath.append(nextPoint)
+                    currentDepth = nextPoint
+                    depthVisited.insert(nextPoint)
+                } else {
+                    centerLinePaths.append(currentPath)
+                    currentPath = [nextPoint]
+                    currentDepth = nextPoint
+                    depthVisited.insert(nextPoint)
+                }
+            }
+            centerLinePaths.append(currentPath)
+            paths[index] = centerLinePaths
         }
         return paths.flatMap { $0 }
     }
     
-
     
     private func averageColor(path: [Point]) -> UIColor {
         let numSamplePoints = min(10, path.count)
@@ -281,6 +293,137 @@ class ImagePathConverter {
         // Find the average color
         let averageColor = UIColor(red: sumColors.r / CGFloat(numSamplePoints), green: sumColors.g / CGFloat(numSamplePoints), blue: sumColors.b / CGFloat(numSamplePoints), alpha: 1.0)
         return averageColor
+    }
+}
+
+
+fileprivate class Connectivity {
+    // We create a singleton so the matrices only have to be computed once
+    static let instance = Connectivity()
+    private let queue = DispatchQueue(label: "connectivity", qos: .userInitiated, autoreleaseFrequency: .workItem, target: nil)
+    
+    private lazy var _edgeMasks: [simd_float3x3] = {
+        let lastHorizontal: simd_float3x3 = {
+            let col0 = simd_float3(0, 0, 0)
+            let col1 = simd_float3(1, 1, 0)
+            let col2 = simd_float3(0, 0, 0)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        return fourRotations(matrix: lastHorizontal)
+    }()
+    
+    private var edgeMasks: [simd_float3x3] {
+        // Prevent the variable from being accessed from a different thread before it's initialized
+        queue.sync {
+            return _edgeMasks
+        }
+    }
+    
+    private func fourRotations(matrix: simd_float3x3) -> [simd_float3x3] {
+        func rotateMatrix(matrix: simd_float3x3) -> simd_float3x3 {
+            let (col0, col1, col2) = matrix.columns
+            let newCol0 = simd_float3(col0.z, col1.z, col2.z)
+            let newCol1 = simd_float3(col0.y, col1.y, col2.y)
+            let newCol2 = simd_float3(col0.x, col1.x, col2.x)
+            return simd_float3x3(newCol0, newCol1, newCol2)
+        }
+        
+        let rot0 = matrix
+        let rot1 = rotateMatrix(matrix: matrix)
+        let rot2 = rotateMatrix(matrix: rot1)
+        let rot3 = rotateMatrix(matrix: rot2)
+        return [rot0, rot1, rot2, rot3]
+    }
+    
+    private lazy var _hitMissMasks: [simd_float3x3] = {
+        var masks = [simd_float3x3]()
+        
+        let horizontal: simd_float3x3 = {
+            let col0 = simd_float3(0, 0, 0)
+            let col1 = simd_float3(1, 1, 0)
+            let col2 = simd_float3(0, 0, 0)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        let topLeft: simd_float3x3 = {
+            let col0 = simd_float3(1, -1, -1)
+            let col1 = simd_float3(-1, 1, 0)
+            let col2 = simd_float3(-1, 0, 1)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        let topCenter: simd_float3x3 = {
+            let col0 = simd_float3(-1, -1, -1)
+            let col1 = simd_float3(1, 1, 0)
+            let col2 = simd_float3(-1, 0, 1)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        let topRight: simd_float3x3 = {
+            let col0 = simd_float3(-1, 0, 1)
+            let col1 = simd_float3(1, 1, 0)
+            let col2 = simd_float3(-1, -1, -1)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        let bottomLeft0: simd_float3x3 = {
+            let col0 = simd_float3(-1, 0, -1)
+            let col1 = simd_float3(1, 1, 1)
+            let col2 = simd_float3(-1, 0, -1)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        let bottomLeft1: simd_float3x3 = {
+            let col0 = simd_float3(-1, 1, -1)
+            let col1 = simd_float3(0, 1, 0)
+            let col2 = simd_float3(-1, 1, -1)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        let bottomMiddle: simd_float3x3 = {
+            let col0 = simd_float3(-1, 0, 1)
+            let col1 = simd_float3(-1, 1, 0)
+            let col2 = simd_float3(-1, 0, 1)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        let bottomRight: simd_float3x3 = {
+            let col0 = simd_float3(-1, 1, -1)
+            let col1 = simd_float3(1, 1, 1)
+            let col2 = simd_float3(-1, 1, -1)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        masks.append(contentsOf: fourRotations(matrix: horizontal))
+        masks.append(contentsOf: fourRotations(matrix: topLeft))
+        masks.append(contentsOf: fourRotations(matrix: topCenter))
+        masks.append(contentsOf: fourRotations(matrix: topRight))
+        masks.append(bottomLeft0)
+        masks.append(bottomLeft1)
+        masks.append(contentsOf: fourRotations(matrix: bottomMiddle))
+        masks.append(bottomRight)
+        
+        return masks
+    }()
+    
+    private var hitMissMasks: [simd_float3x3] {
+        // Prevent the variable from being accessed from a different thread before it's initialized
+        self.queue.sync {
+            return _hitMissMasks
+        }
+    }
+    
+    private func isRequired(point: Point, group: Set<Point>) -> (simd_float3x3) -> Bool {
+        #warning("Implement")
+    }
+    
+    func isEdge(point: Point, group: Set<Point>) -> Bool {
+        #warning("Implement")
+    }
+    
+    func isRequiredForConnectivity(point: Point, group: Set<Point>) -> Bool {
+        #warning("Implement")
     }
 }
 

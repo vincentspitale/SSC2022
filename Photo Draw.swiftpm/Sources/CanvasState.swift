@@ -231,7 +231,7 @@ enum SemanticColor: CaseIterable, Comparable {
         color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
         // If the saturation and brightness are high enough, try to match to a color
         if saturation > 0.4 && brightness > 0.3  {
-            // Have only a few colors match options to prevent incorrect conversions
+            // Have only a few color match options to prevent incorrect conversions
             let supportedColors: [SemanticColor] = [SemanticColor.red, SemanticColor.green, SemanticColor.blue]
             let hueColors = supportedColors.map { ($0, SemanticColor.colorHue(color: $0.color)) }
             let closestColor: (SemanticColor, CGFloat)? = hueColors.reduce(into: nil, { nearestColor, color in

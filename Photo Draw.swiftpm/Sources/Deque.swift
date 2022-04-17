@@ -7,6 +7,9 @@
 
 import Foundation
 
+// Normally I would use Swift Collections, but since loading
+// dependencies requires a network connection, I opted to implement
+// my own custom double-ended queue
 class Deque<T> {
     private let header: Sentinel<T>
     
@@ -14,18 +17,22 @@ class Deque<T> {
         self.header = Sentinel()
     }
     
+    /// Get and remove the value at the head of the deque
     func popFirst() -> T? {
         self.header.popFirst()
     }
     
+    /// Get and remove the value at the tail of the deque
     func popLast() -> T? {
         self.header.popLast()
     }
     
+    /// Add a new item to the end of the deque
     func addAtTail(_ item: T) {
         self.header.addAtTail(item)
     }
     
+    /// Add a new item to the beginning of the deque
     func addAtHead(_ item: T) {
         self.header.addAtHead(item)
     }
@@ -41,6 +48,8 @@ fileprivate protocol NodeProtocol {
     func removeNode() -> T?
 }
 
+// This class should not be created directly, only its subclasses
+// should be used in a linked list
 fileprivate class ANode<T>: NodeProtocol {
     typealias T = T
     typealias U = ANode<T>
