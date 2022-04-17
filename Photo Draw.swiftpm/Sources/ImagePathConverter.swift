@@ -11,6 +11,10 @@ import SwiftUI
 
 fileprivate struct Point: Hashable {
     let x,y: Int
+    
+    func isRequiredForConnectivity(group: Set<Point>) -> Bool {
+        #warning("Implement")
+    }
 }
 
 /// Converts an image to paths for vector drawing
@@ -26,10 +30,13 @@ class ImagePathConverter {
         self.findGroupedConnectedPixels()
     }()
     
+    private lazy var centerLines: [Set<Point>] = {
+        self.findCenterLines()
+    }()
+    
     private lazy var rgbaPixelData: [UInt8]? = {
         image.rgbaPixelData()
     }()
-    
     
     init(image: UIImage) {
         self.image = image
@@ -39,11 +46,16 @@ class ImagePathConverter {
     public func findPaths() -> [(Path, UIColor)] {
         let centerLinePaths = self.findCenterLinePaths()
         // Paths converted to bezier curves by least squares
-        return centerLinePaths.map { path in
+        var pathColors = [[(Path, UIColor)]](repeating: [], count: centerLinePaths.count)
+        
+        DispatchQueue.concurrentPerform(iterations: centerLinePaths.count) { index in
+            let path = centerLinePaths[index]
             let color: UIColor = averageColor(path: path)
             let pointData = path.map { CGPoint(x:CGFloat($0.x), y: CGFloat($0.y))}
-            return (LeastSquaresPath.pathFromPoints(pointData), color)
+            pathColors[index] = [(LeastSquaresPath.pathFromPoints(pointData), color)]
         }
+        
+        return pathColors.flatMap { $0 }
     }
     
     private func pixelAtPoint(_ p: Point) -> Pixel? {
@@ -137,11 +149,76 @@ class ImagePathConverter {
         return Array(groups.values)
     }
     
-    private func findCenterLinePaths() -> [[Point]] {
-        #warning("Implement")
-        return []
+    private func findCenterLines() -> [Set<Point>] {
+        var centerLines = [Set<Point>](repeating: Set<Point>(), count: groupedConnectedPixels.count)
+        DispatchQueue.concurrentPerform(iterations: groupedConnectedPixels.count) { index in
+            let group = groupedConnectedPixels[index]
+            var boundaries = Set<Point>()
+            for point in group {
+                let up = Point(x: point.x, y: point.y - 1)
+                let left = Point(x: point.x - 1, y: point.y)
+                let right = Point(x: point.x + 1, y: point.y)
+                let down = Point(x: point.x, y: point.y + 1)
+                // if any direct neighbors are not in the group, this is a boundary pixel
+                if [up, left, right, down].contains(where: { !group.contains($0) }) {
+                    boundaries.insert(point)
+                }
+            }
+            var updatedBoundaries = boundaries
+            var updatedGroup = group
+            var didChange: Bool = true
+            while didChange {
+                didChange = false
+                let currentBoundaries = updatedBoundaries
+                for boundary in currentBoundaries {
+                    guard updatedBoundaries.contains(boundary) else { continue }
+                    if !boundary.isRequiredForConnectivity(group: updatedGroup) {
+                        didChange = true
+                        
+                        let up = Point(x: boundary.x, y: boundary.y - 1)
+                        let left = Point(x: boundary.x - 1, y: boundary.y)
+                        let right = Point(x: boundary.x + 1, y: boundary.y)
+                        let down = Point(x: boundary.x, y: boundary.y + 1)
+                        let topLeft = Point(x: boundary.x - 1, y: boundary.y - 1)
+                        let topRight = Point(x: boundary.x + 1, y: boundary.y - 1)
+                        let downLeft = Point(x: boundary.x - 1, y: boundary.y + 1)
+                        let downRight = Point(x: boundary.x + 1, y: boundary.y + 1)
+                        
+                        for neighbor in [up, left, right, down, topLeft, topRight, downLeft, downRight] {
+                            if updatedGroup.contains(neighbor) {
+                                updatedBoundaries.insert(neighbor)
+                            }
+                        }
+                        updatedBoundaries.remove(boundary)
+                        updatedGroup.remove(boundary)
+                    }
+                }
+            }
+            
+            centerLines[index] = updatedGroup
+        }
+        
+        return centerLines
     }
     
+    private func findCenterLinePaths() -> [[Point]] {
+        // Allow an arbitrary number of paths to be generated from each center line
+        var paths = [[[Point]]](repeating: [], count: centerLines.count)
+        DispatchQueue.concurrentPerform(iterations: centerLines.count) { index in
+            let centerLineSet = centerLines[index]
+            guard let startingPoint = centerLineSet.min(by: { (lhs, rhs) in
+                return lhs.x + lhs.y < rhs.x + rhs.y
+            }) else { return }
+            
+            // depth first search for the end of the path
+            var startStack = [Point]()
+            
+        
+        }
+        return paths.flatMap { $0 }
+    }
+    
+
     
     private func averageColor(path: [Point]) -> UIColor {
         let numSamplePoints = min(10, path.count)
