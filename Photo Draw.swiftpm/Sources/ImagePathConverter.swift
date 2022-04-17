@@ -12,6 +12,15 @@ import SwiftUI
 fileprivate struct Point: Hashable {
     let x,y: Int
     
+    
+    private func isRequired(group: Set<Point>) -> (simd_float3x3) -> Bool {
+#warning("Implement")
+    }
+    
+    func isEdge(group: Set<Point>) -> Bool {
+        #warning("Implement")
+    }
+    
     func isRequiredForConnectivity(group: Set<Point>) -> Bool {
         #warning("Implement")
     }
@@ -210,8 +219,39 @@ class ImagePathConverter {
                 return lhs.x + lhs.y < rhs.x + rhs.y
             }) else { return }
             
-            // depth first search for the end of the path
-            var startStack = [Point]()
+            // Breadth first search for the end of the path,
+            // we're finding the nearest end of the line
+            let deque = Deque<Point>()
+            let findNeighbors: (Point) -> [Point] = { point in
+                let up = Point(x: point.x, y: point.y - 1)
+                let left = Point(x: point.x - 1, y: point.y)
+                let right = Point(x: point.x + 1, y: point.y)
+                let down = Point(x: point.x, y: point.y + 1)
+                let topLeft = Point(x: point.x - 1, y: point.y - 1)
+                let topRight = Point(x: point.x + 1, y: point.y - 1)
+                let bottomLeft = Point(x: point.x - 1, y: point.y + 1)
+                let bottomRight = Point(x: point.x + 1, y: point.y + 1)
+                
+                return [up, left, right, down, topLeft, topRight, bottomLeft, bottomRight].filter { neighbor in
+                    centerLineSet.contains(neighbor)
+                }
+            }
+            
+            deque.addAtTail(startingPoint)
+            var breadthVisited = Set<Point>()
+            breadthVisited.insert(startingPoint)
+            
+            guard var currentPoint = deque.popFirst() else { return }
+            while !currentPoint.isEdge(group: centerLineSet) {
+                let neighbors = findNeighbors(currentPoint).filter { !breadthVisited.contains($0) }
+                for neighbor in neighbors {
+                    deque.addAtTail(neighbor)
+                }
+                guard let nextPoint = deque.popFirst() else { break }
+                currentPoint = nextPoint
+                breadthVisited.insert(nextPoint)
+            }
+            
             
         
         }
