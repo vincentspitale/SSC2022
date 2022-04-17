@@ -12,6 +12,7 @@ import SwiftUI
 import simd
 
 class CanvasState: ObservableObject {
+    // Strokes that are on the canvas
     @Published var paths = [PhotoDrawPath]()
     @Published var currentColor: SemanticColor = .primary
     @Published var currentTool: CanvasTool = .pen {
@@ -35,6 +36,10 @@ class CanvasState: ObservableObject {
     @Published var isShowingPenColorPicker: Bool = false
     @Published var isShowingSelectionColorPicker: Bool = false
     @Published var photoMode: PhotoMode = .welcome
+    
+    var imageConversion: ImageConversion? = nil
+    // Notify when the image convdrsion has completed
+    var imageCancellable: AnyCancellable? = nil
     
     var hasSelection: Bool {
         self.selection != nil
@@ -80,6 +85,26 @@ class CanvasState: ObservableObject {
     
     func removePaths(_ removeSet: Set<PhotoDrawPath>) {
         paths.removeAll(where: { removeSet.contains($0) })
+    }
+    
+    func startConversion(image: UIImage) {
+        let conversion = ImageConversion(image: image)
+        // Begin background conversion
+        conversion.convert()
+        self.imageConversion = conversion
+        // Subscribe to this image conversion's updates
+        self.imageCancellable = conversion.objectWillChange.sink(receiveValue: { [weak self] _ in
+            self?.objectWillChange.send()
+        })
+        self.currentTool = .placePhoto
+    }
+    
+    /// Adds the image conversion paths to the canvas
+    func placeImage() {
+        guard let imageConversion = imageConversion else { return }
+        let imagePaths = imageConversion.getPaths()
+        self.paths.append(contentsOf: imagePaths)
+        self.currentTool = .pen
     }
 }
 
@@ -130,7 +155,7 @@ class PhotoDrawPath {
     func updatePath(newPath: Path) {
         self.path = newPath
     }
-
+    
 }
 
 extension PhotoDrawPath: Equatable, Hashable {
@@ -140,8 +165,8 @@ extension PhotoDrawPath: Equatable, Hashable {
         lhs.transform == rhs.transform
     }
     func hash(into hasher: inout Hasher) {
-            hasher.combine(path)
-            hasher.combine(color)
+        hasher.combine(path)
+        hasher.combine(color)
     }
 }
 
@@ -234,11 +259,11 @@ enum SemanticColor: CaseIterable, Comparable {
     
 }
 
-class ImageConversion {
+class ImageConversion: ObservableObject {
     let image: UIImage
-    private var paths: [PhotoDrawPath]?
+    private var paths: [PhotoDrawPath]? = nil
     
-    private var scale: CGFloat = 1.0
+    var transform: CGAffineTransform = .identity
     
     var isConversionFinished: Bool {
         paths != nil
@@ -248,12 +273,22 @@ class ImageConversion {
         self.image = image
     }
     
+    /// Start the path conversion of this image
     func convert() {
         Task {
             let convertedPaths = ImagePathConverter(image: image).findPaths()
             self.paths = convertedPaths.map { (path, color) -> PhotoDrawPath in
                 return PhotoDrawPath(path: path, color: color)
             }
+            // Notify that the image has been converted
+            self.objectWillChange.send()
+        }
+    }
+    
+    func getPaths() -> [PhotoDrawPath] {
+        guard let paths = self.paths else { return [] }
+        return paths.map { path in
+            PhotoDrawPath(path: path.path.copy(using: transform), semanticColor: path.color)
         }
     }
 }

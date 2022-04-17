@@ -18,7 +18,7 @@ struct DrawView: View {
     ]
     
     // Get the first three colors that are in the selection
-    var selectionColorIndices: [(Int, SemanticColor)] {
+    var selectionColorIndices: [(index: Int, color: SemanticColor)] {
         let colors = Array(windowState.selectionColors).sorted().enumerated().filter { index, color in
             index < 3
         }.map { $0.1 }
@@ -75,17 +75,24 @@ struct DrawView: View {
                                 self.selectionControls()
                             }
                         } else {
-                            Button(action: {
-                                #warning("Implement")
-                            }) {
-                                    Text("Place and Convert")
-                                        .font(.headline)
-                                        .bold()
-                                        .foregroundColor(Color(uiColor: UIColor.systemBackground))
-                                        .padding()
-                                        .frame(width: 200)
-                                        .background(Color.accentColor)
-                                        .cornerRadius(.greatestFiniteMagnitude)
+                            if let imageConversion = windowState.imageConversion {
+                                if imageConversion.isConversionFinished {
+                                    Button(action: {
+                                        windowState.placeImage()
+                                    }) {
+                                        Text("Place and Convert")
+                                            .font(.headline)
+                                            .bold()
+                                            .foregroundColor(Color(uiColor: UIColor.systemBackground))
+                                            .padding()
+                                            .frame(width: 200)
+                                            .background(Color.accentColor)
+                                            .cornerRadius(.greatestFiniteMagnitude)
+                                    }
+                                } else {
+                                    Text("Finding paths")
+                                        .foregroundColor(.accentColor)
+                                }
                             }
                         }
                         Spacer()
@@ -241,7 +248,7 @@ struct DrawView: View {
         Button(action: { withAnimation{ windowState.isShowingSelectionColorPicker.toggle() }}) {
             ZStack {
                 // Display the colors of the paths that are selected
-                ForEach(selectionColorIndices, id: \.0) { index, color in
+                ForEach(selectionColorIndices, id: \.index) { index, color in
                     Circle()
                         .foregroundColor(Color(uiColor: color.color))
                         .frame(height: 30)

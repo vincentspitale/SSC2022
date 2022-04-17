@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import SwiftUI
 
 fileprivate struct Point: Hashable {
     let x,y: Int
@@ -70,19 +71,76 @@ class ImagePathConverter {
         // This parallelizes detecting if a pixel should be added,
         // making things much faster!
         
-        // Create set of points from the buffer
+        let strokePixels: [Point] = [Point]() // TO DO
         
-        // Iterate through points to separate into groups with DFS
+        // Iterate through points to separate into groups with union-find
+        var groupMap = [Point : Point]()
+        for point in strokePixels {
+            groupMap[point] = point
+        }
+        // The top-leftmost pixel in the stroke should be the starting point of the stroke
+        for point in strokePixels {
+            // Neighboring pixels we're interested in
+            let topLeft = Point(x: point.x - 1, y: point.y - 1)
+            let topMiddle = Point(x: point.x, y: point.y - 1)
+            let topRight = Point(x: point.x + 1, y: point.y - 1)
+            let left = Point(x: point.x - 1, y: point.y)
+            if let newPoint = [topLeft, topMiddle, topRight, left].compactMap({ neighbor -> Point? in
+                guard groupMap[neighbor] != nil else { return nil }
+                var start = point
+                while groupMap[start] != start {
+                    if let newStart = groupMap[start] {
+                        start = newStart
+                    }
+                }
+                return start
+            }).sorted(by: { (lhs, rhs) in
+                // we want to find the top-leftmost pixel
+                if lhs.x == rhs.x {
+                    return lhs.y < rhs.y
+                }
+                return lhs.x < rhs.x
+            }).first {
+                // update where this pixel points to
+                groupMap[point] = newPoint
+                // update neighbors pointers as well
+                if let topLeftPoint = groupMap[topLeft] {
+                    groupMap[topLeftPoint] = newPoint
+                    groupMap[topLeft] = newPoint
+                }
+                if let topMiddlePoint = groupMap[topMiddle] {
+                    groupMap[topMiddlePoint] = newPoint
+                    groupMap[topMiddle] = newPoint
+                }
+                if let topRightPoint = groupMap[topRight] {
+                    groupMap[topRightPoint] = newPoint
+                    groupMap[topRight] = newPoint
+                }
+                if groupMap[left] != nil {
+                    groupMap[left] = newPoint
+                }
+            }
+        }
+        var groups = [Point: Set<Point>]()
+        for point in strokePixels {
+            if let referencedPoint = groupMap[point] {
+                var start = referencedPoint
+                while groupMap[start] != start {
+                    if let newStart = groupMap[start] {
+                        start = newStart
+                    }
+                }
+                groups[start, default: Set<Point>()].insert(point)
+            }
+        }
         
-        
-        return []
+        return Array(groups.values)
     }
     
     private func findCenterLinePaths() -> [[Point]] {
         #warning("Implement")
         return []
     }
-    
     
     
     private func averageColor(path: [Point]) -> UIColor {

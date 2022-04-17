@@ -342,6 +342,18 @@ class RenderView: UIView {
             }
             
         }
+        
+        // Draw the image that's being placed
+        if let imageConversion = state.imageConversion {
+            let imageTransform = imageConversion.transform
+            let size = imageConversion.image.size
+            let rect: CGRect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+            rect.applying(imageTransform)
+            if let cgImage = imageConversion.image.cgImage {
+                context?.draw(cgImage, in: rect)
+            }
+        }
+        
     }
     
 }
