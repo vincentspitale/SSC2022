@@ -52,21 +52,14 @@ class Canvas: UIViewController {
     }
 }
 
-class RenderView: UIView {
+class RenderView: UIView, UIGestureRecognizerDelegate {
     private var state: CanvasState
     
     // Move canvas
     private var canvasTransform: CGAffineTransform = .identity
     
-    private var canvasTranslateStart: CGPoint?
-    private var canvasTranslateEnd: CGPoint?
     
-    private var canvasTranslation: CGAffineTransform? {
-        guard let translateStart = canvasTranslateStart, let translateEnd = canvasTranslateEnd else {
-            return nil
-        }
-        return CGAffineTransform.identity.translatedBy(x: translateEnd.x - translateStart.x, y: translateEnd.y - translateStart.y)
-    }
+    private var canvasTranslation: CGAffineTransform = .identity
     
     // Move selected paths
     private var selectTranslateStart: CGPoint?
@@ -86,7 +79,7 @@ class RenderView: UIView {
     private var removePathPoints: [CGPoint]? = nil
     private var pathsToBeDeleted = Set<PhotoDrawPath>()
     
-    private var cancellable: AnyCancellable? = nil
+    private var cancellables = Set<AnyCancellable>()
     
     // Create a path selection
     private var selectStart: CGPoint?
@@ -102,31 +95,49 @@ class RenderView: UIView {
     // Place photo image resizing
     private var imageScale: CGAffineTransform = .identity
     
-    private var imageTranslateStart: CGPoint?
-    private var imageTranslateEnd: CGPoint?
-    
-    private var imageTranslation: CGAffineTransform? {
-        guard let translateStart = imageTranslateStart, let translateEnd = imageTranslateEnd else {
-            return nil
-        }
-        return CGAffineTransform.identity.translatedBy(x: translateEnd.x - translateStart.x, y: translateEnd.y - translateStart.y)
-    }
+    private var imageTranslation: CGAffineTransform = .identity
     
     var pinchGesture: UIPinchGestureRecognizer?
+    var panGesture: UIPanGestureRecognizer?
     
     init(state: CanvasState, frame: CGRect) {
         self.state = state
         super.init(frame: frame)
         self.backgroundColor = .clear
-        self.cancellable = state.objectWillChange.sink(receiveValue: { [weak self] _ in
+        let toolChange = state.$currentTool.sink(receiveValue: { [weak self] tool in
+            if tool == .touch || tool == .placePhoto {
+                self?.panGesture?.minimumNumberOfTouches = 1
+            } else {
+                self?.panGesture?.minimumNumberOfTouches = 2
+            }
+        })
+        
+        let stateChange = state.objectWillChange.sink(receiveValue: { [weak self] _ in
             self?.setNeedsDisplay()
         })
-        self.pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        
+        self.cancellables.insert(toolChange)
+        self.cancellables.insert(stateChange)
+        
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinch.delegate = self
+        
+        self.pinchGesture = pinch
+        self.addGestureRecognizer(pinch)
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        pan.minimumNumberOfTouches = 2
+        pan.delegate = self
+        self.panGesture = pan
+        self.addGestureRecognizer(pan)
     }
     
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        true
     }
     
     @objc
@@ -147,6 +158,14 @@ class RenderView: UIView {
             updateScale()
         case .changed:
             updateScale()
+        case .cancelled:
+            switch self.state.currentTool {
+            case .placePhoto:
+                self.imageScale = .identity
+                self.state.imageConversion?.transform.concatenating(transform)
+            default:
+                break
+            }
         case .ended:
             switch self.state.currentTool {
             case .placePhoto:
@@ -161,8 +180,49 @@ class RenderView: UIView {
         self.setNeedsDisplay()
     }
     
+    @objc
+    func handlePan(_ sender: UIPanGestureRecognizer) -> Void {
+        // Scale the image that is being converted
+        let point = sender.translation(in: self)
+        
+        let translation = CGAffineTransform.init(translationX: point.x, y: point.y)
+        let updatePan = {
+            let currentTool = self.state.currentTool
+            if currentTool == .placePhoto {
+                self.imageTranslation = translation
+            } else {
+                self.canvasTranslation = translation
+            }
+        }
+        
+        switch sender.state {
+        case .began:
+            updatePan()
+        case .changed:
+            updatePan()
+        case .cancelled:
+            let currentTool = self.state.currentTool
+            if currentTool == .placePhoto {
+                self.finishPhotoTranslate()
+            } else {
+                self.finishCanvasTranslate()
+            }
+        case .ended:
+            let currentTool = self.state.currentTool
+            if currentTool == .placePhoto {
+                self.finishPhotoTranslate()
+            } else {
+                self.finishCanvasTranslate()
+            }
+        default:
+            break
+        }
+        self.setNeedsDisplay()
+    }
+    
     private func translatedPoint(_ point: CGPoint) -> CGPoint {
-        return point.applying(canvasTransform.inverted())
+        let finalTransform = canvasTransform.concatenating(canvasTranslation)
+        return point.applying(finalTransform.inverted())
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -186,10 +246,6 @@ class RenderView: UIView {
         case .remove:
             self.removePoint = currentPoint
             self.removePathPoints = [currentPoint]
-        case .touch:
-            self.canvasTranslateStart = currentPoint
-        case .placePhoto:
-            self.imageTranslateStart = currentPoint
         default:
             break
         }
@@ -229,10 +285,6 @@ class RenderView: UIView {
             for path in self.state.paths where path.path.intersectsOrContainedBy(rect: removeRect) || removePath.intersects(path.path) {
                 pathsToBeDeleted.insert(path)
             }
-        case .touch:
-            self.canvasTranslateEnd = currentPoint
-        case .placePhoto:
-            self.imageTranslateEnd = currentPoint
         default:
             break
         }
@@ -314,21 +366,13 @@ class RenderView: UIView {
     }
     
     private func finishCanvasTranslate() {
-        guard let canvasTranslation = canvasTranslation else {
-            return
-        }
         self.canvasTransform = self.canvasTransform.concatenating(canvasTranslation)
-        self.canvasTranslateStart = nil
-        self.canvasTranslateEnd = nil
+        self.canvasTranslation = .identity
     }
     
     private func finishPhotoTranslate() {
-        guard let imageTranslation = imageTranslation else {
-            return
-        }
         self.state.imageConversion?.transform.concatenating(imageTranslation)
-        self.imageTranslateStart = nil
-        self.imageTranslateEnd = nil
+        self.imageTranslation = .identity
     }
     
     override func draw(_ rect: CGRect) {
@@ -338,9 +382,7 @@ class RenderView: UIView {
         
         // Apply transformation
         context?.concatenate(canvasTransform)
-        if let canvasTranslation = canvasTranslation {
-            context?.concatenate(canvasTranslation)
-        }
+        context?.concatenate(canvasTranslation)
         
         // Draw selection
         if let selectRect = selectRect {
