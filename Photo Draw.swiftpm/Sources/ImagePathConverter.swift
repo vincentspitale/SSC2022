@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import MetalKit
 import SwiftUI
 import simd
 
@@ -70,18 +71,20 @@ class ImagePathConverter {
     
     private func findGroupedConnectedPixels() -> [Set<Point>] {
         
-        #warning("Implement")
         // Use covariance kernel to find lines in the image
+        guard let device = MTLCreateSystemDefaultDevice() else { return [] }
+        let covarianceFilter = CovarianceKernel(image: self.image, device: device)
+        let outputTexture = covarianceFilter.applyKernel()
         
         // Find how many white pixels are in the resulting image
-        
         // Create a buffer that can hold as many points as there are white pixels
         
         // Copy the point locations using the gpu.
         // This parallelizes detecting if a pixel should be added,
         // making things much faster!
+        let streamCompaction = ImageStreamCompaction(inputTexture: outputTexture, device: device)
         
-        let strokePixels: [Point] = [Point]() // TODO
+        let strokePixels: [Point] = streamCompaction.getWhitePoints()
         
         // Iterate through points to separate into groups with union-find
         var groupMap = [Point : Point]()
@@ -490,16 +493,106 @@ fileprivate extension UIImage {
     }
 }
 
-fileprivate class CovarianceKernel {
-    private let image: UIImage
-    
-    //private let imageTexture: MTLTexture
-    //private let outputTexture: MTLTexture
-    //private let device: MTLDevice
-    
-    
-    init(image: UIImage) {
-        self.image = image
+
+fileprivate class TextureManager {
+    enum TextureErrors: Error {
+        case cgImageConversionFailed
+        case textureCreationFailed
     }
     
+    private let textureLoader: MTKTextureLoader
+    
+    init(device: MTLDevice) {
+        self.textureLoader = MTKTextureLoader(device: device)
+    }
+    
+    func texture(cgImage: CGImage, usage: MTLTextureUsage = [.shaderRead, .shaderWrite]) throws -> MTLTexture {
+        let options: [MTKTextureLoader.Option : Any] = [
+            .textureUsage: NSNumber(value: usage.rawValue),
+            .generateMipmaps: NSNumber(value: false),
+            .SRGB: NSNumber(value: false)
+        ]
+        return try self.textureLoader.newTexture(cgImage: cgImage, options: options)
+    }
+    
+    func cgImage(texture: MTLTexture) throws -> CGImage {
+        let bytesPerRow = texture.width * 4 // r,g,b,a
+        let bytesLength = bytesPerRow * texture.height
+        let rgbaBytes = UnsafeMutableRawPointer.allocate(byteCount: bytesLength, alignment: MemoryLayout<UInt8>.alignment)
+        defer { rgbaBytes.deallocate() }
+        
+        let region = MTLRegion(origin: .init(x: 0, y: 0, z: 0), size: .init(width: texture.width, height: texture.height, depth: texture.depth))
+        
+        texture.getBytes(rgbaBytes, bytesPerRow: bytesPerRow, from: region, mipmapLevel: 0)
+        
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitMapInfo = CGBitmapInfo(rawValue: CGImageByteOrderInfo.order32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue)
+        
+        guard let data = CFDataCreate(nil, rgbaBytes.assumingMemoryBound(to: UInt8.self), bytesLength),
+              let dataProvider = CGDataProvider(data: data),
+              let cgImage = CGImage(width: texture.width, height: texture.height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bytesPerRow, space: colorSpace, bitmapInfo: bitMapInfo, provider: dataProvider, decode: nil, shouldInterpolate: true, intent: .defaultIntent) else {
+            throw TextureErrors.cgImageConversionFailed
+        }
+        return cgImage
+    }
+    
+    func createMatchingTexture(texture: MTLTexture) throws -> MTLTexture {
+        let descriptor = MTLTextureDescriptor()
+        descriptor.width = texture.width
+        descriptor.height = texture.height
+        descriptor.pixelFormat = texture.pixelFormat
+        descriptor.storageMode = texture.storageMode
+        descriptor.usage = texture.usage
+        
+        guard let matchingTexture = self.textureLoader.device.makeTexture(descriptor: descriptor) else { throw TextureErrors.textureCreationFailed }
+        return matchingTexture
+    }
+}
+
+fileprivate final class CovarianceKernel {
+    private let device: MTLDevice
+    
+    private let textureManager: TextureManager
+    private let imageTexture: MTLTexture
+    private let outputTexture: MTLTexture
+    
+    private let pipelineState: MTLComputePipelineState
+    
+    
+    init(cgImage: CGImage, library: MTLLibrary, textureManger: TextureManager) throws {
+        self.device = library.device
+        let function = try library.makeFunction(name: "covariance_filter", constantValues: MTLFunctionConstantValues())
+        self.pipelineState = try library.device.makeComputePipelineState(function: function)
+        self.textureManager = textureManger
+        let inputTexture = try textureManger.texture(cgImage: cgImage)
+        self.imageTexture = inputTexture
+        self.outputTexture = try textureManger.createMatchingTexture(texture: inputTexture)
+    }
+    
+    private func encode(source: MTLTexture, destination: MTLTexture, in commandBuffer: MTLCommandBuffer) {
+        guard let encoder = commandBuffer.makeComputeCommandEncoder() else { return }
+        encoder.setTexture(source, index: 0)
+        encoder.setTexture(destination, index: 1)
+        
+        encoder.setComputePipelineState(self.pipelineState)
+        encoder.endEncoding()
+    }
+    
+    func applyKernel() -> CGImage {
+        #warning("implement")
+    }
+    
+}
+
+fileprivate final class ImageStreamCompaction {
+    private let device: MTLDevice
+    private let inputTexture: MTLTexture
+    
+    init(image: UIImage, device: MTLDevice) {
+        self.device = device
+    }
+    
+    func getWhitePoints() -> [Point] {
+        #warning("implement")
+    }
 }

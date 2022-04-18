@@ -141,6 +141,8 @@ class RenderView: UIView {
             self.removePathPoints = [currentPoint]
         case .touch:
             self.canvasTranslateStart = currentPoint
+        case .placePhoto:
+            
         default:
             break
         }
@@ -182,6 +184,8 @@ class RenderView: UIView {
             }
         case .touch:
             self.canvasTranslateEnd = currentPoint
+        case .placePhoto:
+            
         default:
             break
         }
@@ -229,6 +233,8 @@ class RenderView: UIView {
             self.finishRemove()
         case .touch:
             self.finishCanvasTranslate()
+        case .placePhoto:
+            
         default:
             break
         }
