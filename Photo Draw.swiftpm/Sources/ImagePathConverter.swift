@@ -22,7 +22,7 @@ class ImagePathConverter {
         let x, y: Int
         let r, g, b, a: UInt8
     }
-
+    
     let image: UIImage
     
     private lazy var groupedConnectedPixels: [Set<Point>] = {
@@ -518,16 +518,28 @@ fileprivate class TextureManager {
 fileprivate final class CovarianceKernel {
     private let device: MTLDevice
     
+    private var deviceSupportsNonuniformThreadgroups: Bool
     private let textureManager: TextureManager
     private let imageTexture: MTLTexture
     private let outputTexture: MTLTexture
+    private var size: Float = 2
+    private var commandQueue: MTLCommandQueue
+    
     
     private let pipelineState: MTLComputePipelineState
     
     
     init(cgImage: CGImage, library: MTLLibrary, textureManger: TextureManager) throws {
         self.device = library.device
-        let function = try library.makeFunction(name: "covariance_filter", constantValues: MTLFunctionConstantValues())
+        guard let commandQueue = library.device.makeCommandQueue() else {
+            throw MetalErrors.commandQueueCreationFailed
+        }
+        self.commandQueue = commandQueue
+        self.deviceSupportsNonuniformThreadgroups = library.device.supportsFeatureSet(.iOS_GPUFamily4_v1)
+        let constantValues = MTLFunctionConstantValues()
+        
+        constantValues.setConstantValue(&self.deviceSupportsNonuniformThreadgroups, type: .bool, index: 0)
+        let function = try library.makeFunction(name: "covariance_filter", constantValues: constantValues)
         self.pipelineState = try library.device.makeComputePipelineState(function: function)
         self.textureManager = textureManger
         let inputTexture = try textureManger.texture(cgImage: cgImage)
@@ -539,16 +551,57 @@ fileprivate final class CovarianceKernel {
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else { return }
         encoder.setTexture(source, index: 0)
         encoder.setTexture(destination, index: 1)
+        encoder.setBytes(&self.size, length: MemoryLayout<Float>.stride, index: 0)
+        
+        let gridSize = MTLSize(width: source.width, height: source.height, depth: 1)
+        let threadGroupWidth = self.pipelineState.threadExecutionWidth
+        let threadGroupHeight = self.pipelineState.maxTotalThreadsPerThreadgroup / threadGroupWidth
+        let threadGroupSize = MTLSize(width: threadGroupWidth, height: threadGroupHeight, depth: 1)
+        
+        encoder.setComputePipelineState(self.pipelineState)
+        
+        if self.deviceSupportsNonuniformThreadgroups {
+            encoder.dispatchThreads(gridSize,
+                                    threadsPerThreadgroup: threadGroupSize)
+        } else {
+            let threadGroupCount = MTLSize(width: (gridSize.width + threadGroupSize.width - 1) / threadGroupSize.width,
+                                           height: (gridSize.height + threadGroupSize.height - 1) / threadGroupSize.height,
+                                           depth: 1)
+            encoder.dispatchThreadgroups(threadGroupCount,
+                                         threadsPerThreadgroup: threadGroupSize)
+        }
         
         encoder.setComputePipelineState(self.pipelineState)
         encoder.endEncoding()
     }
     
     func applyKernel() throws -> CGImage {
-        #warning("implement")
-        return try textureManager.cgImage(texture: outputTexture)
+        var kernelImages = [CGImage]()
+        let sizes: [Float] = [2, 4, 8, 16, 32, 64]
+        
+        for size in sizes {
+            self.size = size
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+                throw MetalErrors.commandBufferCreationFailed
+            }
+            self.encode(source: self.imageTexture, destination: self.outputTexture, in: commandBuffer)
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            let image = try textureManager.cgImage(texture: outputTexture)
+            kernelImages.append(image)
+        }
+        
+        // Combine kernel images
+        
+        
+        return
     }
     
+}
+
+fileprivate enum MetalErrors: Error {
+    case commandQueueCreationFailed
+    case commandBufferCreationFailed
 }
 
 fileprivate final class ImageStreamCompaction {
@@ -567,7 +620,8 @@ fileprivate final class ImageStreamCompaction {
     
     func getWhitePoints() -> [Point] {
         #warning("implement")
-        let data = outputBuffer.contents().assumingMemoryBound(to: Float32.self)
+        let data = outputBuffer.contents().assumingMemoryBound(to: Float.self)
+        
         return []
     }
 }
