@@ -82,72 +82,38 @@ class ImagePathConverter {
         // Copy the point locations using the gpu.
         // This parallelizes detecting if a pixel should be added,
         // making things much faster!
-        let streamCompaction = ImageStreamCompaction(image: outputImage, device: device)
+        guard let streamCompaction = try? ImageStreamCompaction(cgImage: outputImage, library: library, textureManager: textureManager) else { return [] }
         
         let strokePixels: [Point] = streamCompaction.getWhitePoints()
+        let strokesSet: Set<Point> = Set<Point>(strokePixels)
         
-        // Iterate through points to separate into groups with union-find
-        var groupMap = [Point : Point]()
+        // Iterate through points to separate into connected stroke components
+        // with depth first search
+        var groups = [Set<Point>]()
+        var visited = Set<Point>()
         for point in strokePixels {
-            groupMap[point] = point
-        }
-        // The top-leftmost pixel in the stroke should be the starting point of the stroke
-        for point in strokePixels {
-            // Neighboring pixels we're interested in
-            let topLeft = Point(x: point.x - 1, y: point.y - 1)
-            let topMiddle = Point(x: point.x, y: point.y - 1)
-            let topRight = Point(x: point.x + 1, y: point.y - 1)
-            let left = Point(x: point.x - 1, y: point.y)
-            if let newPoint = [topLeft, topMiddle, topRight, left].compactMap({ neighbor -> Point? in
-                guard groupMap[neighbor] != nil else { return nil }
-                var start = point
-                while groupMap[start] != start {
-                    if let newStart = groupMap[start] {
-                        start = newStart
-                    }
+            guard !visited.contains(point) else { continue }
+            var stroke = Set<Point>()
+            stroke.insert(point)
+            var searchPoints = [point]
+            while !searchPoints.isEmpty {
+                guard let searchPoint = searchPoints.popLast() else { break }
+                // Neighboring pixels we're interested in
+                let up = Point(x: searchPoint.x, y: searchPoint.y - 1)
+                let left = Point(x: searchPoint.x - 1, y: searchPoint.y)
+                let right = Point(x: searchPoint.x + 1, y: searchPoint.y)
+                let down = Point(x: searchPoint.x, y: searchPoint.y + 1)
+                let newPoints = [up, left, right, down].filter { neighbor in
+                    strokesSet.contains(neighbor) && !visited.contains(neighbor)
                 }
-                return start
-            }).sorted(by: { (lhs, rhs) in
-                // we want to find the top-leftmost pixel
-                if lhs.x == rhs.x {
-                    return lhs.y < rhs.y
-                }
-                return lhs.x < rhs.x
-            }).first {
-                // update where this pixel points to
-                groupMap[point] = newPoint
-                // update neighbors pointers as well
-                if let topLeftPoint = groupMap[topLeft] {
-                    groupMap[topLeftPoint] = newPoint
-                    groupMap[topLeft] = newPoint
-                }
-                if let topMiddlePoint = groupMap[topMiddle] {
-                    groupMap[topMiddlePoint] = newPoint
-                    groupMap[topMiddle] = newPoint
-                }
-                if let topRightPoint = groupMap[topRight] {
-                    groupMap[topRightPoint] = newPoint
-                    groupMap[topRight] = newPoint
-                }
-                if groupMap[left] != nil {
-                    groupMap[left] = newPoint
-                }
+                searchPoints.append(contentsOf: newPoints)
+                stroke.insert(searchPoint)
+                visited.insert(searchPoint)
             }
-        }
-        var groups = [Point: Set<Point>]()
-        for point in strokePixels {
-            if let referencedPoint = groupMap[point] {
-                var start = referencedPoint
-                while groupMap[start] != start {
-                    if let newStart = groupMap[start] {
-                        start = newStart
-                    }
-                }
-                groups[start, default: Set<Point>()].insert(point)
-            }
+            groups.append(stroke)
         }
         
-        return Array(groups.values)
+        return groups
     }
     
     private func findCenterLines() -> [Set<Point>] {
@@ -587,14 +553,21 @@ fileprivate final class CovarianceKernel {
 
 fileprivate final class ImageStreamCompaction {
     private let device: MTLDevice
-    //private let inputTexture: MTLTexture
+    private let textureManager: TextureManager
+    private let inputTexture: MTLTexture
+    private let outputBuffer: MTLBuffer
     
-    init(image: CGImage, device: MTLDevice) {
-        self.device = device
+    init(cgImage: CGImage, library: MTLLibrary, textureManager: TextureManager) throws {
+        self.device = library.device
+        self.textureManager = textureManager
+        self.inputTexture = try textureManager.texture(cgImage: cgImage)
+        // stream compaction function
+        
     }
     
     func getWhitePoints() -> [Point] {
         #warning("implement")
+        let data = outputBuffer.contents().assumingMemoryBound(to: Float32.self)
         return []
     }
 }

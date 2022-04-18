@@ -50,7 +50,7 @@ class Canvas: UIViewController {
         if sender.state == .ended {
             withAnimation{ self.state.isShowingPenColorPicker = false }
             withAnimation{ state.selection = nil }
-        }
+        }   
     }
 
     func getCenterScreenCanvasPosition() async -> CGPoint {

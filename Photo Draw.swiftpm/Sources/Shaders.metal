@@ -7,7 +7,6 @@ kernel void covariance_filter(texture2d<float, access::read> inTexture [[texture
     
     float4 accumColor(0, 0, 0, 0);
     
-    
     // Calculate covariance
     float covariance = 0.0;
 
