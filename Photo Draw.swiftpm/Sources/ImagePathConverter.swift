@@ -72,9 +72,9 @@ class ImagePathConverter {
     private func findGroupedConnectedPixels() -> [Set<Point>] {
         
         // Use covariance kernel to find lines in the image
-        guard let device = MTLCreateSystemDefaultDevice() else { return [] }
-        let covarianceFilter = CovarianceKernel(image: self.image, device: device)
-        let outputTexture = covarianceFilter.applyKernel()
+        guard let device = MTLCreateSystemDefaultDevice(), let cgImage = image.cgImage,         let library = device.makeDefaultLibrary() else { return [] }
+        let textureManager = TextureManager(device: device)
+        guard let covarianceFilter = try? CovarianceKernel(cgImage: cgImage, library: library, textureManger: textureManager), let outputImage = try? covarianceFilter.applyKernel() else { return [] }
         
         // Find how many white pixels are in the resulting image
         // Create a buffer that can hold as many points as there are white pixels
@@ -82,7 +82,7 @@ class ImagePathConverter {
         // Copy the point locations using the gpu.
         // This parallelizes detecting if a pixel should be added,
         // making things much faster!
-        let streamCompaction = ImageStreamCompaction(inputTexture: outputTexture, device: device)
+        let streamCompaction = ImageStreamCompaction(image: outputImage, device: device)
         
         let strokePixels: [Point] = streamCompaction.getWhitePoints()
         
@@ -578,21 +578,23 @@ fileprivate final class CovarianceKernel {
         encoder.endEncoding()
     }
     
-    func applyKernel() -> CGImage {
+    func applyKernel() throws -> CGImage {
         #warning("implement")
+        return try textureManager.cgImage(texture: outputTexture)
     }
     
 }
 
 fileprivate final class ImageStreamCompaction {
     private let device: MTLDevice
-    private let inputTexture: MTLTexture
+    //private let inputTexture: MTLTexture
     
-    init(image: UIImage, device: MTLDevice) {
+    init(image: CGImage, device: MTLDevice) {
         self.device = device
     }
     
     func getWhitePoints() -> [Point] {
         #warning("implement")
+        return []
     }
 }

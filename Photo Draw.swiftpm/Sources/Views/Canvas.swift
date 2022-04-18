@@ -99,6 +99,21 @@ class RenderView: UIView {
                       width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
     }
     
+    // Place photo image resizing
+    private var imageScale: CGAffineTransform = .identity
+    
+    private var imageTranslateStart: CGPoint?
+    private var imageTranslateEnd: CGPoint?
+    
+    private var imageTranslation: CGAffineTransform? {
+        guard let translateStart = imageTranslateStart, let translateEnd = imageTranslateEnd else {
+            return nil
+        }
+        return CGAffineTransform.identity.translatedBy(x: translateEnd.x - translateStart.x, y: translateEnd.y - translateStart.y)
+    }
+    
+    var pinchGesture: UIPinchGestureRecognizer?
+    
     init(state: CanvasState, frame: CGRect) {
         self.state = state
         super.init(frame: frame)
@@ -106,6 +121,7 @@ class RenderView: UIView {
         self.cancellable = state.objectWillChange.sink(receiveValue: { [weak self] _ in
             self?.setNeedsDisplay()
         })
+        self.pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
     }
     
     @available(*, unavailable)
@@ -113,6 +129,37 @@ class RenderView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
     
+    @objc
+    func handlePinch(_ sender: UIPinchGestureRecognizer) -> Void {
+        // Scale the image that is being converted
+        let transform = CGAffineTransform(scaleX: sender.scale, y: sender.scale)
+        let updateScale = {
+            switch self.state.currentTool {
+            case .placePhoto:
+                self.imageScale = transform
+            default:
+                break
+            }
+        }
+        
+        switch sender.state {
+        case .began:
+            updateScale()
+        case .changed:
+            updateScale()
+        case .ended:
+            switch self.state.currentTool {
+            case .placePhoto:
+                self.imageScale = .identity
+                self.state.imageConversion?.transform.concatenating(transform)
+            default:
+                break
+            }
+        default:
+            break
+        }
+        self.setNeedsDisplay()
+    }
     
     private func translatedPoint(_ point: CGPoint) -> CGPoint {
         return point.applying(canvasTransform.inverted())
@@ -142,7 +189,7 @@ class RenderView: UIView {
         case .touch:
             self.canvasTranslateStart = currentPoint
         case .placePhoto:
-            
+            self.imageTranslateStart = currentPoint
         default:
             break
         }
@@ -185,7 +232,7 @@ class RenderView: UIView {
         case .touch:
             self.canvasTranslateEnd = currentPoint
         case .placePhoto:
-            
+            self.imageTranslateEnd = currentPoint
         default:
             break
         }
@@ -234,7 +281,7 @@ class RenderView: UIView {
         case .touch:
             self.finishCanvasTranslate()
         case .placePhoto:
-            
+            self.finishPhotoTranslate()
         default:
             break
         }
@@ -273,6 +320,15 @@ class RenderView: UIView {
         self.canvasTransform = self.canvasTransform.concatenating(canvasTranslation)
         self.canvasTranslateStart = nil
         self.canvasTranslateEnd = nil
+    }
+    
+    private func finishPhotoTranslate() {
+        guard let imageTranslation = imageTranslation else {
+            return
+        }
+        self.state.imageConversion?.transform.concatenating(imageTranslation)
+        self.imageTranslateStart = nil
+        self.imageTranslateEnd = nil
     }
     
     override func draw(_ rect: CGRect) {
@@ -355,6 +411,7 @@ class RenderView: UIView {
             let size = imageConversion.image.size
             let rect: CGRect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
             rect.applying(imageTransform)
+            rect.applying(imageScale)
             if let cgImage = imageConversion.image.cgImage {
                 context?.draw(cgImage, in: rect)
             }
