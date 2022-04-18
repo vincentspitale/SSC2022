@@ -36,6 +36,7 @@ struct DrawView: View {
     
     var body: some View {
         ZStack{
+            LibraryPhotoPickerView(windowState: windowState)
             Rectangle()
                 .foregroundColor(Color(uiColor: UIColor.systemGray6))
                 .transition(.opacity)
@@ -53,6 +54,7 @@ struct DrawView: View {
                         .zIndex(0)
                         .padding()
                 }
+                if windowState.currentTool != .placePhoto {
                 ZStack {
                     RoundedRectangle(cornerRadius: .greatestFiniteMagnitude, style: .continuous)
                         .foregroundColor(Color(uiColor: UIColor.systemGray5))
@@ -74,33 +76,39 @@ struct DrawView: View {
                                 Spacer()
                                 self.selectionControls()
                             }
-                        } else {
-                            if let imageConversion = windowState.imageConversion {
-                                if imageConversion.isConversionFinished {
-                                    Button(action: {
-                                        windowState.placeImage()
-                                    }) {
-                                        Text("Place and Convert")
-                                            .font(.headline)
-                                            .bold()
-                                            .foregroundColor(Color(uiColor: UIColor.systemBackground))
-                                            .padding()
-                                            .frame(width: 200)
-                                            .background(Color.accentColor)
-                                            .cornerRadius(.greatestFiniteMagnitude)
-                                    }
-                                } else {
-                                    Text("Finding paths")
-                                        .foregroundColor(.accentColor)
-                                }
-                            }
                         }
                         Spacer()
                     }
                 }
                 .frame(minWidth: nil, idealWidth: toolWidth, maxWidth: toolWidth, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
+                .transition(.opacity.combined(with: .move(edge: self.horizontalSizeClass == .compact ? .bottom : .top)))
                 .zIndex(1)
                 .padding(.horizontal)
+                }
+                if let imageConversion = windowState.imageConversion {
+                    ZStack {
+                        if imageConversion.isConversionFinished {
+                            Button(action: {
+                                windowState.placeImage()
+                            }) {
+                                Text("Place and Convert")
+                                    .font(.headline)
+                                    .bold()
+                                    .foregroundColor(Color(uiColor: UIColor.systemBackground))
+                                    .padding()
+                                    .frame(width: 200)
+                                    .background(Color.accentColor)
+                                    .cornerRadius(.greatestFiniteMagnitude)
+                            }
+                        } else {
+                            Text("Finding paths")
+                                .foregroundColor(.accentColor)
+                        }
+                    }
+                .frame(minWidth: nil, idealWidth: toolWidth, maxWidth: toolWidth, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
+                .zIndex(2)
+                .padding(.horizontal)
+                }
                 if horizontalSizeClass != .compact {
                     self.penColorPicker()
                         .zIndex(0)

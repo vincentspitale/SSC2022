@@ -18,20 +18,25 @@ class CanvasState: ObservableObject {
     @Published var currentColor: SemanticColor = .primary
     @Published var currentTool: CanvasTool = .pen {
         willSet {
-            // No longer in selection mode, remove selection
-            if newValue != CanvasTool.selection {
-                selection = nil
-            }
-            // No longer in pen mode, dismiss the pen color picker
-            if newValue != CanvasTool.pen {
-                withAnimation{ self.isShowingPenColorPicker = false }
+            DispatchQueue.main.async {
+                // No longer in selection mode, remove selection
+                if newValue != CanvasTool.selection {
+                    self.selection = nil
+                }
+                // No longer in pen mode, dismiss the pen color picker
+                if newValue != CanvasTool.pen {
+                    withAnimation{ self.isShowingPenColorPicker = false }
+                }
             }
         }
     }
     @Published var selection: [PhotoDrawPath]? = nil {
         // Selection changed, the selection color picker should not be visible
         willSet {
-            withAnimation{ self.isShowingSelectionColorPicker = false }
+            DispatchQueue.main.async {
+                withAnimation{ self.isShowingSelectionColorPicker = false }
+            }
+            
         }
     }
     @Published var isShowingPenColorPicker: Bool = false
@@ -95,9 +100,13 @@ class CanvasState: ObservableObject {
         self.imageConversion = conversion
         // Subscribe to this image conversion's updates
         self.imageCancellable = conversion.objectWillChange.sink(receiveValue: { [weak self] _ in
-            self?.objectWillChange.send()
+            DispatchQueue.main.async {
+                self?.objectWillChange.send()
+            }
         })
-        self.currentTool = .placePhoto
+        DispatchQueue.main.async {
+            withAnimation { self.currentTool = .placePhoto }
+        }
     }
     
     /// Adds the image conversion paths to the canvas
@@ -105,7 +114,8 @@ class CanvasState: ObservableObject {
         guard let imageConversion = imageConversion else { return }
         let imagePaths = imageConversion.getPaths()
         self.paths.append(contentsOf: imagePaths)
-        self.currentTool = .pen
+        withAnimation { self.currentTool = .pen }
+        self.imageConversion = nil
     }
 }
 
@@ -264,7 +274,24 @@ class ImageConversion: ObservableObject {
     let image: UIImage
     private var paths: [PhotoDrawPath]? = nil
     
-    var transform: CGAffineTransform = .identity
+    lazy var scaleTransform: CGAffineTransform = {
+        // Initially fit the image within a 300 point square
+        let dimension: CGFloat = 300
+        guard let cgImage = image.cgImage else { return .identity }
+        let width = cgImage.width
+        let height = cgImage.height
+        let max: CGFloat = CGFloat(max(width, height))
+        let scale = dimension / max
+        let flipVertical = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: CGFloat(height))
+        let transform = flipVertical.concatenating(CGAffineTransform.init(scaleX: scale, y: scale))
+        return transform
+    }()
+    
+    var translateTransform: CGAffineTransform = .identity
+    
+    var transform: CGAffineTransform {
+        return scaleTransform.concatenating(translateTransform)
+    }
     
     var isConversionFinished: Bool {
         paths != nil
@@ -272,6 +299,14 @@ class ImageConversion: ObservableObject {
     
     init(image: UIImage) {
         self.image = image
+    }
+    
+    func applyTranslate(transform: CGAffineTransform) {
+        self.translateTransform = self.translateTransform.concatenating(transform)
+    }
+    
+    func applyScale(transform: CGAffineTransform) {
+        self.scaleTransform = self.scaleTransform.concatenating(transform)
     }
     
     /// Start the path conversion of this image

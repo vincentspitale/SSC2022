@@ -58,7 +58,6 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
     // Move canvas
     private var canvasTransform: CGAffineTransform = .identity
     
-    
     private var canvasTranslation: CGAffineTransform = .identity
     
     // Move selected paths
@@ -104,6 +103,9 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         self.state = state
         super.init(frame: frame)
         self.backgroundColor = .clear
+    
+        // If the current tool changes, update the number of touches required
+        // to trigger the pan gesture to allow the tools to be used
         let toolChange = state.$currentTool.sink(receiveValue: { [weak self] tool in
             if tool == .touch || tool == .placePhoto {
                 self?.panGesture?.minimumNumberOfTouches = 1
@@ -162,7 +164,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             switch self.state.currentTool {
             case .placePhoto:
                 self.imageScale = .identity
-                self.state.imageConversion?.transform.concatenating(transform)
+                self.state.imageConversion?.applyScale(transform: transform)
             default:
                 break
             }
@@ -170,7 +172,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             switch self.state.currentTool {
             case .placePhoto:
                 self.imageScale = .identity
-                self.state.imageConversion?.transform.concatenating(transform)
+                self.state.imageConversion?.applyScale(transform: transform)
             default:
                 break
             }
@@ -203,16 +205,16 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         case .cancelled:
             let currentTool = self.state.currentTool
             if currentTool == .placePhoto {
-                self.finishPhotoTranslate()
+                self.finishPhotoTranslate(translation)
             } else {
-                self.finishCanvasTranslate()
+                self.finishCanvasTranslate(translation)
             }
         case .ended:
             let currentTool = self.state.currentTool
             if currentTool == .placePhoto {
-                self.finishPhotoTranslate()
+                self.finishPhotoTranslate(translation)
             } else {
-                self.finishCanvasTranslate()
+                self.finishCanvasTranslate(translation)
             }
         default:
             break
@@ -330,10 +332,6 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             }
         case .remove:
             self.finishRemove()
-        case .touch:
-            self.finishCanvasTranslate()
-        case .placePhoto:
-            self.finishPhotoTranslate()
         default:
             break
         }
@@ -365,13 +363,13 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         self.removePathPoints = nil
     }
     
-    private func finishCanvasTranslate() {
-        self.canvasTransform = self.canvasTransform.concatenating(canvasTranslation)
+    private func finishCanvasTranslate(_ translation: CGAffineTransform) {
+        self.canvasTransform = self.canvasTransform.concatenating(translation)
         self.canvasTranslation = .identity
     }
     
-    private func finishPhotoTranslate() {
-        self.state.imageConversion?.transform.concatenating(imageTranslation)
+    private func finishPhotoTranslate(_ translation: CGAffineTransform) {
+        self.state.imageConversion?.applyTranslate(transform: translation)
         self.imageTranslation = .identity
     }
     
@@ -449,14 +447,19 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         
         // Draw the image that's being placed
         if let imageConversion = state.imageConversion {
-            let imageTransform = imageConversion.transform
             let size = imageConversion.image.size
-            let rect: CGRect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
-            rect.applying(imageTransform)
-            rect.applying(imageScale)
+            var rect: CGRect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+            rect = rect.applying(imageConversion.scaleTransform)
+            rect = rect.applying(imageScale)
+            rect = rect.applying(imageConversion.translateTransform)
+            rect = rect.applying(imageTranslation)
+            context?.saveGState()
+            context?.translateBy(x: 0, y: rect.origin.y + rect.height)
+            context?.scaleBy(x: 1, y: -1)
             if let cgImage = imageConversion.image.cgImage {
-                context?.draw(cgImage, in: rect)
+                context?.draw(cgImage, in: CGRect(origin: CGPoint(x: rect.origin.x, y: 0), size: rect.size))
             }
+            context?.restoreGState()
         }
         
     }
