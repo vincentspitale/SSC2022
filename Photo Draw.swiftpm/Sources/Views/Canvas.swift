@@ -13,10 +13,12 @@ import SwiftUI
 
 class Canvas: UIViewController {
     var state: CanvasState
+    var renderView: RenderView? = nil
     
     init(state: CanvasState) {
         self.state = state
         super.init(nibName: nil, bundle: nil)
+        state.canvas = self
     }
     
     @available(*, unavailable)
@@ -40,7 +42,7 @@ class Canvas: UIViewController {
             renderView.widthAnchor.constraint(equalTo: renderView.heightAnchor),
         ]
         NSLayoutConstraint.activate(constraints)
-        
+        self.renderView = renderView
     }
     
     @objc
@@ -50,13 +52,25 @@ class Canvas: UIViewController {
             withAnimation{ state.selection = nil }
         }
     }
+
+    func getCenterScreenCanvasPosition() async -> CGPoint {
+        let screen = await MainActor.run { () -> CGRect in
+            return self.view.bounds
+        }
+        let canvas = await MainActor.run { () -> CGRect in
+            return self.renderView?.bounds ?? CGRect.zero
+        }
+        let centerScreen = CGPoint(x: canvas.width / 2, y: screen.height / 2)
+        guard let transform = self.renderView?.canvasTransform else { return CGPoint(x: 0, y: 0)}
+        return centerScreen.applying(transform.inverted())
+    }
 }
 
 class RenderView: UIView, UIGestureRecognizerDelegate {
     private var state: CanvasState
     
     // Move canvas
-    private var canvasTransform: CGAffineTransform = .identity
+    var canvasTransform: CGAffineTransform = .identity
     
     private var canvasTranslation: CGAffineTransform = .identity
     

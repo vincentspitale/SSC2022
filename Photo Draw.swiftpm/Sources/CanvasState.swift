@@ -11,6 +11,7 @@ import UIKit
 import SwiftUI
 import simd
 
+@MainActor
 class CanvasState: ObservableObject {
     // Strokes that are on the canvas
     @Published var paths = [PhotoDrawPath]()
@@ -46,6 +47,8 @@ class CanvasState: ObservableObject {
     var imageConversion: ImageConversion? = nil
     // Notify when the image convdrsion has completed
     var imageCancellable: AnyCancellable? = nil
+    
+    weak var canvas: Canvas? = nil
     
     var hasSelection: Bool {
         self.selection != nil
@@ -93,18 +96,19 @@ class CanvasState: ObservableObject {
         paths.removeAll(where: { removeSet.contains($0) })
     }
     
-    func startConversion(image: UIImage) {
-        let conversion = ImageConversion(image: image)
-        // Begin background conversion
-        conversion.convert()
-        self.imageConversion = conversion
-        // Subscribe to this image conversion's updates
-        self.imageCancellable = conversion.objectWillChange.sink(receiveValue: { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.objectWillChange.send()
-            }
-        })
-        DispatchQueue.main.async {
+    func startConversion(image: UIImage) async {
+            let centerScreen = await self.canvas?.getCenterScreenCanvasPosition() ?? CGPoint(x: 0, y: 0)
+            let conversion = ImageConversion(image: image, position: centerScreen)
+            // Begin background conversion
+            conversion.convert()
+            self.imageConversion = conversion
+            // Subscribe to this image conversion's updates
+            self.imageCancellable = conversion.objectWillChange.sink(receiveValue: { _ in
+                Task { @MainActor in
+                    self.objectWillChange.send()
+                }
+            })
+        Task { @MainActor in
             withAnimation { self.currentTool = .placePhoto }
         }
     }
@@ -275,8 +279,8 @@ class ImageConversion: ObservableObject {
     private var paths: [PhotoDrawPath]? = nil
     
     lazy var scaleTransform: CGAffineTransform = {
-        // Initially fit the image within a 300 point square
-        let dimension: CGFloat = 300
+        // Initially fit the image within a 400 point square
+        let dimension: CGFloat = 400
         guard let cgImage = image.cgImage else { return .identity }
         let width = cgImage.width
         let height = cgImage.height
@@ -287,7 +291,7 @@ class ImageConversion: ObservableObject {
         return transform
     }()
     
-    var translateTransform: CGAffineTransform = .identity
+    var translateTransform: CGAffineTransform
     
     var transform: CGAffineTransform {
         return scaleTransform.concatenating(translateTransform)
@@ -297,8 +301,14 @@ class ImageConversion: ObservableObject {
         paths != nil
     }
     
-    init(image: UIImage) {
+    init(image: UIImage, position: CGPoint) {
         self.image = image
+        self.translateTransform = CGAffineTransform(translationX: position.x, y: position.y)
+        let size = image.size
+        // translate the image so that the image is centered on the canvas
+        var rect: CGRect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+        rect = rect.applying(scaleTransform)
+        self.translateTransform = translateTransform.translatedBy(x: -1 * CGFloat(rect.width) / 2, y: -1 * CGFloat(rect.height) / 2)
     }
     
     func applyTranslate(transform: CGAffineTransform) {

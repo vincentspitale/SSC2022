@@ -50,8 +50,10 @@ class LibraryPhotoPicker: UIViewController, PHPickerViewControllerDelegate {
         self.state.photoMode = .none
         guard let result = results.first else { return }
         result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] photo, error in
-            guard let image = photo as? UIImage else { return }
-            self?.state.startConversion(image: image)
+            guard let self = self, let image = photo as? UIImage else { return }
+            Task { @MainActor in
+                await self.state.startConversion(image: image)
+            }
         }
     }
     
