@@ -26,7 +26,8 @@ class ImagePathConverter {
     let image: UIImage
     
     private lazy var groupedConnectedPixels: [Set<Point>] = {
-        self.findGroupedConnectedPixels()
+        let groups = try? self.findGroupedConnectedPixels()
+        return groups ?? []
     }()
     
     private lazy var centerLines: [Set<Point>] = {
@@ -69,22 +70,15 @@ class ImagePathConverter {
         return Pixel(x: p.x, y: p.y, r: r, g: g, b: b, a: a)
     }
     
-    private func findGroupedConnectedPixels() -> [Set<Point>] {
-        
+    private func findGroupedConnectedPixels() throws -> [Set<Point>] {
         // Use covariance kernel to find lines in the image
         guard let device = MTLCreateSystemDefaultDevice(), let cgImage = image.cgImage,         let library = device.makeDefaultLibrary() else { return [] }
         let textureManager = TextureManager(device: device)
-        guard let covarianceFilter = try? CovarianceKernel(cgImage: cgImage, library: library, textureManger: textureManager), let outputImage = try? covarianceFilter.applyKernel() else { return [] }
+        let covarianceFilter = try CorrelationKernel(cgImage: cgImage, library: library, textureManger: textureManager)
+        let outputImage = try covarianceFilter.applyKernel()
         
-        // Find how many white pixels are in the resulting image
-        // Create a buffer that can hold as many points as there are white pixels
         
-        // Copy the point locations using the gpu.
-        // This parallelizes detecting if a pixel should be added,
-        // making things much faster!
-        guard let streamCompaction = try? ImageStreamCompaction(cgImage: outputImage, library: library, textureManager: textureManager) else { return [] }
-        
-        let strokePixels: [Point] = streamCompaction.getWhitePoints()
+        let strokePixels: [Point] =
         let strokesSet: Set<Point> = Set<Point>(strokePixels)
         
         // Iterate through points to separate into connected stroke components
@@ -515,22 +509,26 @@ fileprivate class TextureManager {
     }
 }
 
-fileprivate final class CovarianceKernel {
+fileprivate final class CorrelationKernel {
+    private let library: MTLLibrary
     private let device: MTLDevice
-    
-    private var deviceSupportsNonuniformThreadgroups: Bool
     private let textureManager: TextureManager
     private let imageTexture: MTLTexture
     private let outputTexture: MTLTexture
     private var size: Float = 2
+    private var invert: Bool
     private var commandQueue: MTLCommandQueue
-    
-    
     private let pipelineState: MTLComputePipelineState
     
+    private var deviceSupportsNonuniformThreadgroups: Bool
     
     init(cgImage: CGImage, library: MTLLibrary, textureManger: TextureManager) throws {
+        self.library = library
         self.device = library.device
+        
+        var brightness: CGFloat = 0
+        (cgImage.averageColor ?? .white).getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
+        self.invert = brightness > 0.5
         guard let commandQueue = library.device.makeCommandQueue() else {
             throw MetalErrors.commandQueueCreationFailed
         }
@@ -539,7 +537,7 @@ fileprivate final class CovarianceKernel {
         let constantValues = MTLFunctionConstantValues()
         
         constantValues.setConstantValue(&self.deviceSupportsNonuniformThreadgroups, type: .bool, index: 0)
-        let function = try library.makeFunction(name: "covariance_filter", constantValues: constantValues)
+        let function = try library.makeFunction(name: "correlation_filter", constantValues: constantValues)
         self.pipelineState = try library.device.makeComputePipelineState(function: function)
         self.textureManager = textureManger
         let inputTexture = try textureManger.texture(cgImage: cgImage)
@@ -552,6 +550,7 @@ fileprivate final class CovarianceKernel {
         encoder.setTexture(source, index: 0)
         encoder.setTexture(destination, index: 1)
         encoder.setBytes(&self.size, length: MemoryLayout<Float>.stride, index: 0)
+        encoder.setBytes(&self.invert, length: MemoryLayout<Bool>.stride, index: 1)
         
         let gridSize = MTLSize(width: source.width, height: source.height, depth: 1)
         let threadGroupWidth = self.pipelineState.threadExecutionWidth
@@ -577,7 +576,7 @@ fileprivate final class CovarianceKernel {
     
     func applyKernel() throws -> CGImage {
         var kernelImages = [CGImage]()
-        let sizes: [Float] = [2, 4, 8, 16, 32, 64]
+        let sizes: [Float] = [2, 4, 8, 16, 32]
         
         for size in sizes {
             self.size = size
@@ -592,9 +591,70 @@ fileprivate final class CovarianceKernel {
         }
         
         // Combine kernel images
+        guard let finalImage = kernelImages.reduce(into: CGImage?.none, { lastImage, nextImage in
+            guard let previousImage = lastImage else {
+                lastImage = nextImage
+            }
+            guard let combiner = try? CombineImage(cgImageOne: previousImage, cgImageTwo: nextImage, library: library, textureManger: textureManager) else { return }
+            if let newImage = try? combiner.applyKernel() {
+                lastImage = newImage
+            }
+        }) else {
+            throw MetalErrors.kernelFailed
+        }
         
+        return finalImage
+    }
+    
+    fileprivate final class CombineImage {
+        private let device: MTLDevice
+        private let textureManager: TextureManager
+        private let inputTextureOne: MTLTexture
+        private let inputTextureTwo: MTLTexture
+        private let outputTexture: MTLTexture
         
-        return
+        private var commandQueue: MTLCommandQueue
+        private let pipelineState: MTLComputePipelineState
+        private var deviceSupportsNonuniformThreadgroups: Bool
+        
+        init(cgImageOne: CGImage, cgImageTwo: CGImage, library: MTLLibrary, textureManger: TextureManager) throws {
+            
+        }
+        
+        func applyKernel() throws -> CGImage {
+            #warning("implement")
+            
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            return try textureManager.cgImage(texture: outputTexture)
+        }
+        
+    }
+    
+    fileprivate final class BinaryImage {
+        private let device: MTLDevice
+        private let textureManager: TextureManager
+        private let inputTexture: MTLTexture
+        private let outputTexture: MTLTexture
+        
+        private var commandQueue: MTLCommandQueue
+        private let pipelineState: MTLComputePipelineState
+        
+        private var deviceSupportsNonuniformThreadgroups: Bool
+        
+        init(cgImage: CGImage, library: MTLLibrary, textureManager: TextureManager) throws {
+            self.device = library.device
+            self.textureManager = textureManager
+            self.inputTexture = try textureManager.texture(cgImage: cgImage)
+            
+        }
+        
+        func getBinaryImage() throws -> CGImage {
+            #warning("implement")
+            
+            
+            return try textureManager.cgImage(texture: outputTexture)
+        }
     }
     
 }
@@ -602,26 +662,24 @@ fileprivate final class CovarianceKernel {
 fileprivate enum MetalErrors: Error {
     case commandQueueCreationFailed
     case commandBufferCreationFailed
+    case kernelFailed
 }
 
-fileprivate final class ImageStreamCompaction {
-    private let device: MTLDevice
-    private let textureManager: TextureManager
-    private let inputTexture: MTLTexture
-    private let outputBuffer: MTLBuffer
-    
-    init(cgImage: CGImage, library: MTLLibrary, textureManager: TextureManager) throws {
-        self.device = library.device
-        self.textureManager = textureManager
-        self.inputTexture = try textureManager.texture(cgImage: cgImage)
-        // stream compaction function
-        
-    }
-    
-    func getWhitePoints() -> [Point] {
-        #warning("implement")
-        let data = outputBuffer.contents().assumingMemoryBound(to: Float.self)
-        
-        return []
+
+/// Source: https://www.hackingwithswift.com/example-code/media/how-to-read-the-average-color-of-a-uiimage-using-ciareaaverage
+/// We can use this extension to get the average brightness for the current image
+fileprivate extension CGImage {
+    var averageColor: UIColor? {
+        let inputImage = CIImage(cgImage: self)
+        let extentVector = CIVector(x: inputImage.extent.origin.x, y: inputImage.extent.origin.y, z: inputImage.extent.size.width, w: inputImage.extent.size.height)
+
+        guard let filter = CIFilter(name: "CIAreaAverage", parameters: [kCIInputImageKey: inputImage, kCIInputExtentKey: extentVector]) else { return nil }
+        guard let outputImage = filter.outputImage else { return nil }
+
+        var bitmap = [UInt8](repeating: 0, count: 4)
+        let context = CIContext(options: [.workingColorSpace: kCFNull])
+        context.render(outputImage, toBitmap: &bitmap, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: nil)
+
+        return UIColor(red: CGFloat(bitmap[0]) / 255, green: CGFloat(bitmap[1]) / 255, blue: CGFloat(bitmap[2]) / 255, alpha: CGFloat(bitmap[3]) / 255)
     }
 }
