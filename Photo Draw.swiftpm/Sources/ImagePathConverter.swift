@@ -74,7 +74,7 @@ class ImagePathConverter {
         // Use covariance kernel to find lines in the image
         guard let device = MTLCreateSystemDefaultDevice(), let cgImage = image.cgImage,         let library = device.makeDefaultLibrary() else { return [] }
         let textureManager = TextureManager(device: device)
-        let covarianceFilter = try CorrelationKernel(cgImage: cgImage, library: library, textureManger: textureManager)
+        let covarianceFilter = try CorrelationKernel(cgImage: cgImage, library: library, textureManager: textureManager)
         let outputImage = try covarianceFilter.applyKernel()
         
         // This part could be slow
@@ -529,7 +529,6 @@ fileprivate class TextureManager {
 
 fileprivate final class CorrelationKernel {
     private let library: MTLLibrary
-    private let device: MTLDevice
     private let textureManager: TextureManager
     private let imageTexture: MTLTexture
     private let outputTexture: MTLTexture
@@ -540,13 +539,11 @@ fileprivate final class CorrelationKernel {
     
     private var deviceSupportsNonuniformThreadgroups: Bool
     
-    init(cgImage: CGImage, library: MTLLibrary, textureManger: TextureManager) throws {
+    init(cgImage: CGImage, library: MTLLibrary, textureManager: TextureManager) throws {
         self.library = library
-        self.device = library.device
-        
         var brightness: CGFloat = 0
         (cgImage.averageColor ?? .white).getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
-        self.invert = brightness > 0.5
+        self.invert = brightness < 0.5
         guard let commandQueue = library.device.makeCommandQueue() else {
             throw MetalErrors.commandQueueCreationFailed
         }
@@ -557,10 +554,10 @@ fileprivate final class CorrelationKernel {
         constantValues.setConstantValue(&self.deviceSupportsNonuniformThreadgroups, type: .bool, index: 0)
         let function = try library.makeFunction(name: "correlation_filter", constantValues: constantValues)
         self.pipelineState = try library.device.makeComputePipelineState(function: function)
-        self.textureManager = textureManger
-        let inputTexture = try textureManger.texture(cgImage: cgImage)
+        self.textureManager = textureManager
+        let inputTexture = try textureManager.texture(cgImage: cgImage)
         self.imageTexture = inputTexture
-        self.outputTexture = try textureManger.createMatchingTexture(texture: inputTexture)
+        self.outputTexture = try textureManager.createMatchingTexture(texture: inputTexture)
     }
     
     private func encode(source: MTLTexture, destination: MTLTexture, in commandBuffer: MTLCommandBuffer) {
@@ -612,8 +609,9 @@ fileprivate final class CorrelationKernel {
         guard let combinedImage = kernelImages.reduce(into: CGImage?.none, { lastImage, nextImage in
             guard let previousImage = lastImage else {
                 lastImage = nextImage
+                return
             }
-            guard let combiner = try? CombineImage(cgImageOne: previousImage, cgImageTwo: nextImage, library: library, textureManger: textureManager) else { return }
+            guard let combiner = try? CombineImage(cgImageOne: previousImage, cgImageTwo: nextImage, library: library, textureManager: textureManager) else { return }
             if let newImage = try? combiner.applyKernel() {
                 lastImage = newImage
             }
@@ -629,7 +627,6 @@ fileprivate final class CorrelationKernel {
     }
     
     fileprivate final class CombineImage {
-        private let device: MTLDevice
         private let textureManager: TextureManager
         private let inputTextureOne: MTLTexture
         private let inputTextureTwo: MTLTexture
@@ -639,12 +636,57 @@ fileprivate final class CorrelationKernel {
         private let pipelineState: MTLComputePipelineState
         private var deviceSupportsNonuniformThreadgroups: Bool
         
-        init(cgImageOne: CGImage, cgImageTwo: CGImage, library: MTLLibrary, textureManger: TextureManager) throws {
+        init(cgImageOne: CGImage, cgImageTwo: CGImage, library: MTLLibrary, textureManager: TextureManager) throws {
+            guard let commandQueue = library.device.makeCommandQueue() else {
+                throw MetalErrors.commandQueueCreationFailed
+            }
+            self.commandQueue = commandQueue
+            self.deviceSupportsNonuniformThreadgroups = library.device.supportsFeatureSet(.iOS_GPUFamily4_v1)
+            let constantValues = MTLFunctionConstantValues()
             
+            constantValues.setConstantValue(&self.deviceSupportsNonuniformThreadgroups, type: .bool, index: 0)
+            let function = try library.makeFunction(name: "combine_confidence", constantValues: constantValues)
+            self.pipelineState = try library.device.makeComputePipelineState(function: function)
+            self.textureManager = textureManager
+            let inputTextureOne = try textureManager.texture(cgImage: cgImageOne)
+            let inputTextureTwo = try textureManager.texture(cgImage: cgImageTwo)
+            self.inputTextureOne = inputTextureOne
+            self.inputTextureTwo = inputTextureTwo
+            self.outputTexture = try textureManager.createMatchingTexture(texture: inputTextureOne)
         }
         
         func applyKernel() throws -> CGImage {
-            #warning("implement")
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+                throw MetalErrors.commandBufferCreationFailed
+            }
+            
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
+                throw MetalErrors.encoderCreationFailed
+            }
+            encoder.setTexture(inputTextureOne, index: 0)
+            encoder.setTexture(inputTextureTwo, index: 1)
+            encoder.setTexture(outputTexture, index: 2)
+            
+            let gridSize = MTLSize(width: inputTextureOne.width, height: inputTextureOne.height, depth: 1)
+            let threadGroupWidth = self.pipelineState.threadExecutionWidth
+            let threadGroupHeight = self.pipelineState.maxTotalThreadsPerThreadgroup / threadGroupWidth
+            let threadGroupSize = MTLSize(width: threadGroupWidth, height: threadGroupHeight, depth: 1)
+            
+            encoder.setComputePipelineState(self.pipelineState)
+            
+            if self.deviceSupportsNonuniformThreadgroups {
+                encoder.dispatchThreads(gridSize,
+                                        threadsPerThreadgroup: threadGroupSize)
+            } else {
+                let threadGroupCount = MTLSize(width: (gridSize.width + threadGroupSize.width - 1) / threadGroupSize.width,
+                                               height: (gridSize.height + threadGroupSize.height - 1) / threadGroupSize.height,
+                                               depth: 1)
+                encoder.dispatchThreadgroups(threadGroupCount,
+                                             threadsPerThreadgroup: threadGroupSize)
+            }
+            
+            encoder.setComputePipelineState(self.pipelineState)
+            encoder.endEncoding()
             
             commandBuffer.commit()
             commandBuffer.waitUntilCompleted()
@@ -654,7 +696,6 @@ fileprivate final class CorrelationKernel {
     }
     
     fileprivate final class BinaryImage {
-        private let device: MTLDevice
         private let textureManager: TextureManager
         private let inputTexture: MTLTexture
         private let outputTexture: MTLTexture
@@ -665,16 +706,56 @@ fileprivate final class CorrelationKernel {
         private var deviceSupportsNonuniformThreadgroups: Bool
         
         init(cgImage: CGImage, library: MTLLibrary, textureManager: TextureManager) throws {
-            self.device = library.device
-            self.textureManager = textureManager
-            self.inputTexture = try textureManager.texture(cgImage: cgImage)
+            guard let commandQueue = library.device.makeCommandQueue() else {
+                throw MetalErrors.commandQueueCreationFailed
+            }
+            self.commandQueue = commandQueue
+            self.deviceSupportsNonuniformThreadgroups = library.device.supportsFeatureSet(.iOS_GPUFamily4_v1)
+            let constantValues = MTLFunctionConstantValues()
             
+            constantValues.setConstantValue(&self.deviceSupportsNonuniformThreadgroups, type: .bool, index: 0)
+            let function = try library.makeFunction(name: "threshold_filter", constantValues: constantValues)
+            self.pipelineState = try library.device.makeComputePipelineState(function: function)
+            self.textureManager = textureManager
+            let inputTexture = try textureManager.texture(cgImage: cgImage)
+            self.inputTexture = inputTexture
+            self.outputTexture = try textureManager.createMatchingTexture(texture: inputTexture)
         }
         
         func getBinaryImage() throws -> CGImage {
-            #warning("implement")
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+                throw MetalErrors.commandBufferCreationFailed
+            }
             
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
+                throw MetalErrors.encoderCreationFailed
+            }
+            encoder.setTexture(inputTexture, index: 0)
+            encoder.setTexture(outputTexture, index: 1)
             
+            let gridSize = MTLSize(width: inputTexture.width, height: inputTexture.height, depth: 1)
+            let threadGroupWidth = self.pipelineState.threadExecutionWidth
+            let threadGroupHeight = self.pipelineState.maxTotalThreadsPerThreadgroup / threadGroupWidth
+            let threadGroupSize = MTLSize(width: threadGroupWidth, height: threadGroupHeight, depth: 1)
+            
+            encoder.setComputePipelineState(self.pipelineState)
+            
+            if self.deviceSupportsNonuniformThreadgroups {
+                encoder.dispatchThreads(gridSize,
+                                        threadsPerThreadgroup: threadGroupSize)
+            } else {
+                let threadGroupCount = MTLSize(width: (gridSize.width + threadGroupSize.width - 1) / threadGroupSize.width,
+                                               height: (gridSize.height + threadGroupSize.height - 1) / threadGroupSize.height,
+                                               depth: 1)
+                encoder.dispatchThreadgroups(threadGroupCount,
+                                             threadsPerThreadgroup: threadGroupSize)
+            }
+            
+            encoder.setComputePipelineState(self.pipelineState)
+            encoder.endEncoding()
+            
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
             return try textureManager.cgImage(texture: outputTexture)
         }
     }
@@ -682,6 +763,7 @@ fileprivate final class CorrelationKernel {
 }
 
 fileprivate enum MetalErrors: Error {
+    case encoderCreationFailed
     case commandQueueCreationFailed
     case commandBufferCreationFailed
     case kernelFailed

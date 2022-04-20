@@ -27,19 +27,23 @@ kernel void correlation_filter(texture2d<float, access::read> inTexture [[textur
     float gaussianSumBrightness = 0;
     float sampleSumBrightness = 0;
     // Compute a 2d gaussian
-    for (int i = max(0, position.x - int(size)); i < min(textureSize.x, position.x + int(size)); i++) {
-        for (int j = max(0, position.y - int(size)); j < min(textureSize.y, position.y + int(size)); j++) {
+    for (int i = max(0, int(position.x) - int(size)); i < min(int(textureSize.x), int(position.x) + int(size)); i++) {
+        for (int j = max(0, int(position.y) - int(size)); j < min(int(textureSize.y), int(position.y) + int(size)); j++) {
             sampleCount += 1;
             
             // sample brightness
             const auto sample = inTexture.read(uint2(i,j));
-            sampleSumBrightness += luminance(sample.rgb);
+            float sampleBrightness = luminance(sample.rgb);
+            if (invert) {
+                sampleBrightness = 1 - sampleBrightness;
+            }
+            sampleSumBrightness += sampleBrightness;
             
             // Bivariate Gaussian Distribution:
             // e^(1/2 (-x^2/1^2 - y^2/σ^2))/(2π σ^2)
             const int x = i - position.x;
             const int y = j - position.y;
-            float gaussianSample = (pow(2.718, 0.5 * (-1 * (pow(x, 2)/pow(sigma, 2)) + (-1 * (pow(y, 2)/pow(sigma, 2)))))) / (2 * 3.1415 * pow(sigma, 2));
+            float gaussianSample = (pow(2.718, 0.5 * (-1 * (pow(x, 2.0)/pow(sigma, 2.0)) + (-1 * (pow(y, 2.0)/pow(sigma, 2.0)))))) / (2.0 * 3.1415 * pow(sigma, 2.0));
             gaussianSumBrightness += gaussianSample;
             
         }
@@ -53,17 +57,20 @@ kernel void correlation_filter(texture2d<float, access::read> inTexture [[textur
     float numeratorSum = 0;
     float denominatorSumSample = 0;
     float denominatorSumGaussian = 0;
-    for (int i = max(0, position.x - int(size)); i < min(textureSize.x, position.x + int(size)); i++) {
-        for (int j = max(0, position.y - int(size)); j < min(textureSize.y, position.y + int(size)); j++) {
+    for (int i = max(0, int(position.x) - int(size)); i < min(int(textureSize.x), int(position.x) + int(size)); i++) {
+        for (int j = max(0, int(position.y) - int(size)); j < min(int(textureSize.y), int(position.y) + int(size)); j++) {
             // sample brightness
             const auto sample = inTexture.read(uint2(i,j));
-            const float sampleBrightness = luminance(sample.rgb);
+            float sampleBrightness = luminance(sample.rgb);
+            if (invert) {
+                sampleBrightness = 1 - sampleBrightness;
+            }
             
             // Bivariate Gaussian Distribution:
             // e^(1/2 (-x^2/1^2 - y^2/σ^2))/(2π σ^2)
             const int x = i - position.x;
             const int y = j - position.y;
-            float gaussianSample = (pow(2.718, 0.5 * (-1 * (pow(x, 2)/pow(sigma, 2)) + (-1 * (pow(y, 2)/pow(sigma, 2)))))) / (2 * 3.1415 * pow(sigma, 2));
+            float gaussianSample = (pow(2.718, 0.5 * (-1 * (pow(x, 2.0)/pow(sigma, 2.0)) + (-1 * (pow(y, 2.0)/pow(sigma, 2.0)))))) / (2.0 * 3.1415 * pow(sigma, 2.0));
             
             float numerator = (sampleBrightness - sampleAverage) * (gaussianSample - gaussianAverage);
             numeratorSum += numerator;
@@ -127,8 +134,8 @@ kernel void threshold_filter(texture2d<float, access::read> inTexture [[texture(
     float4 black(0, 0, 0, 1);
     
     if (sample.r > 0.1) {
-        outTexture.write(white, position);
-    } else {
         outTexture.write(black, position);
+    } else {
+        outTexture.write(white, position);
     }
 }
