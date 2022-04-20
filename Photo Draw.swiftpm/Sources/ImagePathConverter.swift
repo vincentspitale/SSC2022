@@ -630,7 +630,11 @@ fileprivate final class CorrelationKernel {
         
         let filteredImage = try averageBrightnessFilter.applyKernel()
         
-        return filteredImage
+        let addMissingPixels = try AddMissingPixels(cgImageOne: originalImage, cgImageTwo: filteredImage, averageBrightness: averageBrightness, library: library, textureManager: textureManager)
+        
+        let recoveredImage = try addMissingPixels.applyKernel()
+        
+        return recoveredImage
     }
     
     fileprivate final class CombineImage {
@@ -787,7 +791,80 @@ fileprivate final class CorrelationKernel {
             let constantValues = MTLFunctionConstantValues()
             
             constantValues.setConstantValue(&self.deviceSupportsNonuniformThreadgroups, type: .bool, index: 0)
-            let function = try library.makeFunction(name: "differsFromAverageBrightness", constantValues: constantValues)
+            let function = try library.makeFunction(name: "differs_from_average_brightness", constantValues: constantValues)
+            self.pipelineState = try library.device.makeComputePipelineState(function: function)
+            self.textureManager = textureManager
+            let inputTextureOne = try textureManager.texture(cgImage: cgImageOne)
+            let inputTextureTwo = try textureManager.texture(cgImage: cgImageTwo)
+            self.inputTextureOne = inputTextureOne
+            self.inputTextureTwo = inputTextureTwo
+            self.outputTexture = try textureManager.createMatchingTexture(texture: inputTextureOne)
+            self.averageBrightness = averageBrightness
+        }
+        
+        func applyKernel() throws -> CGImage {
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+                throw MetalErrors.commandBufferCreationFailed
+            }
+            
+            guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
+                throw MetalErrors.encoderCreationFailed
+            }
+            encoder.setTexture(inputTextureOne, index: 0)
+            encoder.setTexture(inputTextureTwo, index: 1)
+            encoder.setTexture(outputTexture, index: 2)
+            encoder.setBytes(&self.averageBrightness, length: MemoryLayout<Float>.stride, index: 0)
+            
+            let gridSize = MTLSize(width: inputTextureOne.width, height: inputTextureOne.height, depth: 1)
+            let threadGroupWidth = self.pipelineState.threadExecutionWidth
+            let threadGroupHeight = self.pipelineState.maxTotalThreadsPerThreadgroup / threadGroupWidth
+            let threadGroupSize = MTLSize(width: threadGroupWidth, height: threadGroupHeight, depth: 1)
+            
+            encoder.setComputePipelineState(self.pipelineState)
+            
+            if self.deviceSupportsNonuniformThreadgroups {
+                encoder.dispatchThreads(gridSize,
+                                        threadsPerThreadgroup: threadGroupSize)
+            } else {
+                let threadGroupCount = MTLSize(width: (gridSize.width + threadGroupSize.width - 1) / threadGroupSize.width,
+                                               height: (gridSize.height + threadGroupSize.height - 1) / threadGroupSize.height,
+                                               depth: 1)
+                encoder.dispatchThreadgroups(threadGroupCount,
+                                             threadsPerThreadgroup: threadGroupSize)
+            }
+            
+            encoder.setComputePipelineState(self.pipelineState)
+            encoder.endEncoding()
+            
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            return try textureManager.cgImage(texture: outputTexture)
+        }
+        
+    }
+    
+    
+    fileprivate final class AddMissingPixels {
+        private let textureManager: TextureManager
+        private let inputTextureOne: MTLTexture
+        private let inputTextureTwo: MTLTexture
+        private let outputTexture: MTLTexture
+        private var averageBrightness: Float
+        
+        private var commandQueue: MTLCommandQueue
+        private let pipelineState: MTLComputePipelineState
+        private var deviceSupportsNonuniformThreadgroups: Bool
+        
+        init(cgImageOne: CGImage, cgImageTwo: CGImage, averageBrightness: Float, library: MTLLibrary, textureManager: TextureManager) throws {
+            guard let commandQueue = library.device.makeCommandQueue() else {
+                throw MetalErrors.commandQueueCreationFailed
+            }
+            self.commandQueue = commandQueue
+            self.deviceSupportsNonuniformThreadgroups = library.device.supportsFeatureSet(.iOS_GPUFamily4_v1)
+            let constantValues = MTLFunctionConstantValues()
+            
+            constantValues.setConstantValue(&self.deviceSupportsNonuniformThreadgroups, type: .bool, index: 0)
+            let function = try library.makeFunction(name: "add_missing_pixels", constantValues: constantValues)
             self.pipelineState = try library.device.makeComputePipelineState(function: function)
             self.textureManager = textureManager
             let inputTextureOne = try textureManager.texture(cgImage: cgImageOne)
