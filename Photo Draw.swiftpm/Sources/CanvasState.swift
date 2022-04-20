@@ -243,27 +243,49 @@ enum SemanticColor: CaseIterable, Comparable {
         var hue: CGFloat = 0.0
         var saturation: CGFloat = 0.0
         var brightness: CGFloat = 0.0
+        
+        
+        var r: CGFloat = 0.0
+        var g: CGFloat = 0.0
+        var b: CGFloat = 0.0
+        
+        color.getRed(&r, green: &g, blue: &b, alpha: nil)
+        
         color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
         // If the saturation and brightness are high enough, try to match to a color
-        if saturation > 0.7 && brightness > 0.1  {
-            // Have only a few color match options to prevent incorrect conversions
-            let supportedColors: [SemanticColor] = [SemanticColor.red, SemanticColor.green, SemanticColor.blue]
-            let hueColors = supportedColors.map { ($0, SemanticColor.colorHue(color: $0.color)) }
-            let closestColor: (SemanticColor, CGFloat)? = hueColors.reduce(into: nil, { nearestColor, color in
-                if let (_, previousHue) = nearestColor {
-                    if abs(hue - color.1) < abs(hue - previousHue)  {
-                        nearestColor = color
-                    }
-                } else {
-                    nearestColor = color
+        // Have only a few color match options to prevent incorrect conversions
+        let supportedColors: [SemanticColor] = [SemanticColor.red, SemanticColor.green, SemanticColor.blue]
+        let hueColors = supportedColors.map { ($0, $0.color) }
+        let closestColor: (SemanticColor, CGFloat)? = hueColors.reduce(into: nil, { nearestColor, color in
+            var colorR: CGFloat = 0.0
+            var colorG: CGFloat = 0.0
+            var colorB: CGFloat = 0.0
+            
+            color.1.getRed(&colorR, green: &colorG, blue: &colorB, alpha: nil)
+            let crossProduct = r * colorR + g * colorG + b * colorB
+            
+            if let (semanticColor, similarity) = nearestColor {
+                if crossProduct > similarity  {
+                    nearestColor = (semanticColor, crossProduct)
                 }
-            })
-            if let closestColor = closestColor, abs(closestColor.1 - hue) < 0.1 {
+            } else {
+                nearestColor = (color.0, crossProduct)
+            }
+        })
+        
+        if let closestColor = closestColor {
+            let color = closestColor.0.color
+            var colorR: CGFloat = 0.0
+            var colorG: CGFloat = 0.0
+            var colorB: CGFloat = 0.0
+            
+            color.getRed(&colorR, green: &colorG, blue: &colorB, alpha: nil)
+            if max(abs(colorR - r), abs(colorG - g), abs(colorB - b)) < 0.3 {
                 return closestColor.0
             }
         }
-        
         return .primary
+        
     }
     
     private static func colorHue(color: UIColor) -> CGFloat {

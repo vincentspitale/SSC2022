@@ -78,8 +78,8 @@
             filePath = "Sources/CanvasState.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "283"
-            endingLineNumber = "283"
+            startingLineNumber = "310"
+            endingLineNumber = "310"
             landmarkName = "scaleTransform"
             landmarkType = "24">
          </BreakpointContent>
@@ -94,9 +94,9 @@
             filePath = "Sources/CanvasState.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "329"
-            endingLineNumber = "329"
-            landmarkName = "convert()"
+            startingLineNumber = "356"
+            endingLineNumber = "356"
+            landmarkName = "getPaths()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -110,8 +110,8 @@
             filePath = "Sources/CanvasState.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "325"
-            endingLineNumber = "325"
+            startingLineNumber = "352"
+            endingLineNumber = "352"
             landmarkName = "convert()"
             landmarkType = "7">
          </BreakpointContent>
@@ -183,16 +183,32 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "6D5E3DA4-1BB6-4D33-8CCC-FC8FE5D3ECA1"
+            uuid = "ADF8EB2E-AEC7-4828-B06C-DBB3635CDDE6"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Sources/ImagePathConverter.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "637"
+            endingLineNumber = "637"
+            landmarkName = "applyKernel()"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "AFD6B09C-01B9-4AF0-8904-9E90B726C630"
             shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "Sources/Deque.swift"
+            filePath = "Sources/CanvasState.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "22"
-            endingLineNumber = "22"
-            landmarkName = "popFirst()"
+            startingLineNumber = "249"
+            endingLineNumber = "249"
+            landmarkName = "colorToSemanticColor(color:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

@@ -1,6 +1,6 @@
 //
 //  Deque.swift
-//  
+//
 //
 //  Created by Vincent Spitale on 4/17/22.
 //
@@ -52,7 +52,7 @@ fileprivate class ANode<T>: NodeProtocol {
     var prev: U? = nil
     
     // By default removing a node does nothing
-    func removeNode() -> T? {
+    func getData() -> T? {
         return nil
     }
 }
@@ -61,22 +61,27 @@ fileprivate class ANode<T>: NodeProtocol {
 fileprivate class Sentinel<T>: ANode<T> {
     
     func popFirst() -> T? {
-        return self.next?.removeNode()
+        let prev = self.prev
+        self.prev = prev?.next
+        return prev?.getData()
     }
     
     func popLast() -> T? {
-        return self.prev?.removeNode()
+        let next = self.next
+        self.next = next?.prev
+        return next?.getData()
     }
     
     func addAtTail(_ item: T) {
-        guard self.next != nil && self.prev != nil else {
+        guard let next = self.next else {
             let node = Node<T>(item, next: self, prev: self)
             self.prev = node
             self.next = node
             return
         }
-        let node = Node<T>(item, next: self, prev: self.prev)
-        self.prev = node
+        let node = Node<T>(item, next: self, prev: self.next)
+        next.next = node
+        self.next = node
     }
     
 }
@@ -91,10 +96,7 @@ fileprivate class Node<T>: ANode<T> {
         self.prev = prev
     }
     
-    // Nodes can be removed from the linked list by forwarding neighboring references
-    override func removeNode() -> T? {
-        prev?.next = next
-        next?.prev = prev
+    override func getData() -> T? {
         return data
     }
 }
