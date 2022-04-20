@@ -245,7 +245,7 @@ enum SemanticColor: CaseIterable, Comparable {
         var brightness: CGFloat = 0.0
         color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
         // If the saturation and brightness are high enough, try to match to a color
-        if saturation > 0.4 && brightness > 0.3  {
+        if saturation > 0.7 && brightness > 0.1  {
             // Have only a few color match options to prevent incorrect conversions
             let supportedColors: [SemanticColor] = [SemanticColor.red, SemanticColor.green, SemanticColor.blue]
             let hueColors = supportedColors.map { ($0, SemanticColor.colorHue(color: $0.color)) }
@@ -286,8 +286,7 @@ class ImageConversion: ObservableObject {
         let height = cgImage.height
         let max: CGFloat = CGFloat(max(width, height))
         let scale = dimension / max
-        let flipVertical = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: CGFloat(height))
-        let transform = flipVertical.concatenating(CGAffineTransform.init(scaleX: scale, y: scale))
+        let transform = CGAffineTransform.init(scaleX: scale, y: scale)
         return transform
     }()
     

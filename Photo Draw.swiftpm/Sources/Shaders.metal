@@ -139,3 +139,31 @@ kernel void threshold_filter(texture2d<float, access::read> inTexture [[texture(
         outTexture.write(white, position);
     }
 }
+
+kernel void differsFromAverageBrightness(texture2d<float, access::read> inTexture [[texture(0)]],
+                                         texture2d<float, access::read> inTextureTwo [[texture(1)]],
+                                         texture2d<float, access:: write> outTexture [[texture(2)]],
+                                         constant float& averageBrightness [[ buffer(0) ]],
+                                         uint2 position [[thread_position_in_grid]]) {
+    
+    const auto textureSize = ushort2(outTexture.get_width(), outTexture.get_height());
+    
+    if (!deviceSupportsNonuniformThreadgroups) {
+        if (position.x >= textureSize.x || position.y >= textureSize.y) {
+               return;
+        }
+    }
+    
+    const auto sampleOriginal = inTexture.read(position);
+    const auto sampleBinary = inTextureTwo.read(position);
+    
+    const float brightness = luminance(sampleOriginal.rgb);
+    
+    float4 black(0, 0, 0, 1);
+    if (abs(brightness - averageBrightness) < 0.20) {
+        outTexture.write(black, position);
+    } else {
+        outTexture.write(sampleBinary, position);
+    }
+    
+}

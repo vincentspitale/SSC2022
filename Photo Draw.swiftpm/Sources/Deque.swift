@@ -32,10 +32,6 @@ class Deque<T> {
         self.header.addAtTail(item)
     }
     
-    /// Add a new item to the beginning of the deque
-    func addAtHead(_ item: T) {
-        self.header.addAtHead(item)
-    }
 }
 
 // Create a doubly linked list structure of a generic type
@@ -72,12 +68,13 @@ fileprivate class Sentinel<T>: ANode<T> {
         return self.prev?.removeNode()
     }
     
-    func addAtHead(_ item: T) {
-        let node = Node<T>(item, next: self.next, prev: self)
-        self.next = node
-    }
-    
     func addAtTail(_ item: T) {
+        guard self.next != nil && self.prev != nil else {
+            let node = Node<T>(item, next: self, prev: self)
+            self.prev = node
+            self.next = node
+            return
+        }
         let node = Node<T>(item, next: self, prev: self.prev)
         self.prev = node
     }
