@@ -21,7 +21,7 @@ kernel void correlation_filter(texture2d<float, access::read> inTexture [[textur
         }
     }
     
-    float deviation = size / 3.0;
+    float sigma = size / 3.0;
     
     int sampleCount = 0;
     float gaussianSumBrightness = 0;
@@ -30,6 +30,17 @@ kernel void correlation_filter(texture2d<float, access::read> inTexture [[textur
     for (int i = max(0, position.x - int(size)); i < min(textureSize.x, position.x + int(size)); i++) {
         for (int j = max(0, position.y - int(size)); j < min(textureSize.y, position.y + int(size)); j++) {
             sampleCount += 1;
+            
+            // sample brightness
+            const auto sample = inTexture.read(uint2(i,j));
+            sampleSumBrightness += luminance(sample.rgb);
+            
+            // Bivariate Gaussian Distribution:
+            // e^(1/2 (-x^2/1^2 - y^2/σ^2))/(2π σ^2)
+            const int x = i - position.x;
+            const int y = j - position.y;
+            float gaussianSample = (pow(2.718, 0.5 * (-1 * (pow(x, 2)/pow(sigma, 2)) + (-1 * (pow(y, 2)/pow(sigma, 2)))))) / (2 * 3.1415 * pow(sigma, 2));
+            gaussianSumBrightness += gaussianSample;
             
         }
     }
@@ -44,7 +55,24 @@ kernel void correlation_filter(texture2d<float, access::read> inTexture [[textur
     float denominatorSumGaussian = 0;
     for (int i = max(0, position.x - int(size)); i < min(textureSize.x, position.x + int(size)); i++) {
         for (int j = max(0, position.y - int(size)); j < min(textureSize.y, position.y + int(size)); j++) {
+            // sample brightness
+            const auto sample = inTexture.read(uint2(i,j));
+            const float sampleBrightness = luminance(sample.rgb);
             
+            // Bivariate Gaussian Distribution:
+            // e^(1/2 (-x^2/1^2 - y^2/σ^2))/(2π σ^2)
+            const int x = i - position.x;
+            const int y = j - position.y;
+            float gaussianSample = (pow(2.718, 0.5 * (-1 * (pow(x, 2)/pow(sigma, 2)) + (-1 * (pow(y, 2)/pow(sigma, 2)))))) / (2 * 3.1415 * pow(sigma, 2));
+            
+            float numerator = (sampleBrightness - sampleAverage) * (gaussianSample - gaussianAverage);
+            numeratorSum += numerator;
+            
+            float denominatorSample = pow(sampleBrightness - sampleAverage, 2);
+            float denominatorGaussian = pow(gaussianSample - gaussianAverage, 2);
+            
+            denominatorSumSample += denominatorSample;
+            denominatorSumGaussian += denominatorGaussian;
         }
     }
     

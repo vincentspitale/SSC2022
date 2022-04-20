@@ -52,7 +52,7 @@ class ImagePathConverter {
             let path = centerLinePaths[index]
             let color: UIColor = averageColor(path: path)
             let pointData = path.map { CGPoint(x:CGFloat($0.x), y: CGFloat($0.y))}
-            pathColors[index] = [(LeastSquaresPath.pathFromPoints(pointData), color)]
+            pathColors[index] = [(CreatePath.pathFromPoints(pointData), color)]
         }
         
         return pathColors.flatMap { $0 }
@@ -77,8 +77,26 @@ class ImagePathConverter {
         let covarianceFilter = try CorrelationKernel(cgImage: cgImage, library: library, textureManger: textureManager)
         let outputImage = try covarianceFilter.applyKernel()
         
+        // This part could be slow
+        let size = self.image.size
+        guard let outputData = UIImage(cgImage: outputImage).rgbaPixelData() else { return [] }
+        let numPixels: Int = Int(size.width) * Int(size.height)
+        var growingStrokePixelArray = [Point]()
+        let semaphore = DispatchSemaphore(value: 1)
+        DispatchQueue.concurrentPerform(iterations: numPixels) { index in
+            let startIndex = index * 4
+            let r = outputData[startIndex]
+            
+            guard r > 100 else { return }
+            
+            let x = index % Int(self.image.size.width)
+            let y = index / Int(self.image.size.width)
+            semaphore.wait()
+            growingStrokePixelArray.append(Point(x: x, y: y))
+            semaphore.signal()
+        }
         
-        let strokePixels: [Point] =
+        let strokePixels = growingStrokePixelArray
         let strokesSet: Set<Point> = Set<Point>(strokePixels)
         
         // Iterate through points to separate into connected stroke components
@@ -591,7 +609,7 @@ fileprivate final class CorrelationKernel {
         }
         
         // Combine kernel images
-        guard let finalImage = kernelImages.reduce(into: CGImage?.none, { lastImage, nextImage in
+        guard let combinedImage = kernelImages.reduce(into: CGImage?.none, { lastImage, nextImage in
             guard let previousImage = lastImage else {
                 lastImage = nextImage
             }
@@ -603,7 +621,11 @@ fileprivate final class CorrelationKernel {
             throw MetalErrors.kernelFailed
         }
         
-        return finalImage
+        let binaryFilter = try BinaryImage(cgImage: combinedImage, library: library, textureManager: textureManager)
+        
+        let binaryImage = try binaryFilter.getBinaryImage()
+        
+        return binaryImage
     }
     
     fileprivate final class CombineImage {
@@ -667,7 +689,7 @@ fileprivate enum MetalErrors: Error {
 
 
 /// Source: https://www.hackingwithswift.com/example-code/media/how-to-read-the-average-color-of-a-uiimage-using-ciareaaverage
-/// We can use this extension to get the average brightness for the current image
+/// We can use this extension to get the average color for the current image and then get its brightness
 fileprivate extension CGImage {
     var averageColor: UIColor? {
         let inputImage = CIImage(cgImage: self)

@@ -278,7 +278,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             currentPath.dataPoints.append(currentPoint)
             self.currentPath = currentPath
             // Update bezier path to fit new data
-            let newPath = LeastSquaresPath.pathFromPoints(currentPath.dataPoints)
+            let newPath = CreatePath.pathFromPoints(currentPath.dataPoints)
             currentPath.path.updatePath(newPath: newPath)
             
         case .selection:
@@ -296,7 +296,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             self.removePoint = currentPoint
             guard var removePathPoints = removePathPoints else { return }
             removePathPoints.append(currentPoint)
-            let removePath = LeastSquaresPath.pathFromPoints(removePathPoints)
+            let removePath = CreatePath.pathFromPoints(removePathPoints)
             let removeRect = CGRect(x: currentPoint.x - 5, y: currentPoint.y - 5, width: 10, height: 10)
             for path in self.state.paths where path.path.intersectsOrContainedBy(rect: removeRect) || removePath.intersects(path.path) {
                 pathsToBeDeleted.insert(path)
@@ -326,7 +326,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             currentPath.dataPoints.append(currentPoint)
             self.currentPath = currentPath
             // Update bezier path to fit new data
-            let newPath = LeastSquaresPath.pathFromPoints(currentPath.dataPoints)
+            let newPath = CreatePath.pathFromPoints(currentPath.dataPoints)
             currentPath.path.updatePath(newPath: newPath)
             
             self.finishPath()
