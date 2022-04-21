@@ -252,8 +252,9 @@ enum SemanticColor: CaseIterable, Comparable {
         color.getRed(&r, green: &g, blue: &b, alpha: nil)
         
         color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
-        // If the saturation and brightness are high enough, try to match to a color
+        
         // Have only a few color match options to prevent incorrect conversions
+        // Use colors that are independent of system theme, light or dark mode
         let red = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)
         let green = #colorLiteral(red: 0, green: 1, blue: 0, alpha: 1)
         let blue = #colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)

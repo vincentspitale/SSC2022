@@ -461,6 +461,8 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
     }
     
     override func draw(_ rect: CGRect) {
+        // Convert screen rect to canvas space
+        let transformedRect = rect.applying(canvasTransform.inverted()).applying(canvasTranslation.inverted())
         let context = UIGraphicsGetCurrentContext()
         context?.setLineCap(.round)
         context?.setShouldAntialias(true)
@@ -512,7 +514,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         }
         
         // Draw all bezier paths
-        for path in state.paths where path.path.boundingBox.cgRect.intersects(rect) {
+        for path in state.paths where path.path.boundingBox.cgRect.applying(path.transform).intersects(transformedRect) {
             
             // Paths that have been touched by the remove tool should have lower opacity
             let color = pathsToBeDeleted.contains(path) ? path.color.color.withAlphaComponent(0.3).cgColor : path.color.color.cgColor
