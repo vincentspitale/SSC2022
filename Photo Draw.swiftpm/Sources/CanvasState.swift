@@ -14,7 +14,8 @@ import simd
 @MainActor
 class CanvasState: ObservableObject {
     // Strokes that are on the canvas
-    @Published var paths = [PhotoDrawPath]()
+    private var currentPathState: (paths: [UUID : PhotoDrawPath], order: [UUID]) = ([:], [])
+    private var previousPathState: (paths: [UUID : PhotoDrawPath], order: [UUID])?
     // The color of the pen tool
     @Published var currentColor: SemanticColor = .primary
     @Published var currentTool: CanvasTool = .pen {
@@ -31,7 +32,7 @@ class CanvasState: ObservableObject {
             }
         }
     }
-    @Published var selection: [PhotoDrawPath]? = nil {
+    @Published var selection: Set<UUID>? = nil {
         // Selection changed, the selection color picker should not be visible
         willSet {
             DispatchQueue.main.async {
@@ -59,7 +60,10 @@ class CanvasState: ObservableObject {
     }
     
     var selectedPaths: [PhotoDrawPath] {
-        return selection ?? []
+        guard let selection = selection else { return [] }
+        return selection.compactMap { id in
+            self.currentPathState.paths[id]
+        }
     }
     
     var selectionColors: Set<SemanticColor> {
@@ -68,32 +72,63 @@ class CanvasState: ObservableObject {
         })
     }
     
+    var paths: [PhotoDrawPath] {
+        self.currentPathState.order.compactMap { id in
+            return self.currentPathState.paths[id]
+        }
+    }
+    
     enum SelectionModifyError: Error {
         case noSelection
     }
     
+    func updatePaths(paths: [PhotoDrawPath]) {
+        var newPaths = [PhotoDrawPath]()
+        for path in paths {
+            if self.currentPathState.paths[path.id] == nil {
+                newPaths.append(path)
+            }
+            self.currentPathState.paths[path.id] = path
+        }
+        for newPath in newPaths {
+            self.currentPathState.order.append(newPath.id)
+        }
+    }
+    
+    func pathsForIdentifiers(ids: Set<UUID>) -> [PhotoDrawPath] {
+        return ids.compactMap { id in
+            return self.currentPathState.paths[id]
+        }
+    }
+    
     func recolorSelection(newColor: SemanticColor) throws -> Void {
-        guard let selection = selection else {
+        guard selection != nil else {
             throw SelectionModifyError.noSelection
         }
-        for path in selection {
+        let updatedPaths = selectedPaths.map { path -> PhotoDrawPath in
+            var path = path
             path.color = newColor
+            return path
         }
+        self.updatePaths(paths: updatedPaths)
+        
         // Update the canvas with the new color
         objectWillChange.send()
     }
     
     func removeSelectionPaths() throws -> Void {
-        guard selection != nil else {
+        guard let selection = selection else {
             throw SelectionModifyError.noSelection
         }
-        let selectionSet = Set<PhotoDrawPath>(selectedPaths)
-        paths.removeAll(where: { selectionSet.contains($0) })
+        self.removePaths(selection)
         withAnimation { self.selection = nil }
     }
     
-    func removePaths(_ removeSet: Set<PhotoDrawPath>) {
-        paths.removeAll(where: { removeSet.contains($0) })
+    func removePaths(_ removeSet: Set<UUID>) {
+        for id in removeSet {
+            self.currentPathState.paths.removeValue(forKey: id)
+        }
+        self.currentPathState.order = self.currentPathState.order.filter { !removeSet.contains($0)}
     }
     
     func startConversion(image: UIImage) async {
@@ -117,7 +152,7 @@ class CanvasState: ObservableObject {
     func placeImage() {
         guard let imageConversion = imageConversion else { return }
         let imagePaths = imageConversion.getPaths()
-        self.paths.append(contentsOf: imagePaths)
+        self.updatePaths(paths: imagePaths)
         withAnimation { self.currentTool = .pen }
         self.imageConversion = nil
     }
@@ -141,24 +176,28 @@ enum PhotoMode {
 }
 
 
-class PhotoDrawPath {
+struct PhotoDrawPath: Identifiable {
+    var id: UUID
     var path: Path
     var color: SemanticColor
     var transform: CGAffineTransform
     
     init(path: Path, color: UIColor) {
+        self.id = UUID()
         self.path = path
         self.color = SemanticColor.colorToSemanticColor(color: color)
         self.transform = .identity
     }
     
     init(path: Path, semanticColor: SemanticColor) {
+        self.id = UUID()
         self.path = path
         self.color = semanticColor
         self.transform = .identity
     }
     
-    func transform(_ newTransform: CGAffineTransform, commitTransform: Bool) {
+    
+    mutating func transform(_ newTransform: CGAffineTransform, commitTransform: Bool) {
         self.transform = newTransform
         if commitTransform {
             self.path = self.path.copy(using: newTransform)
@@ -167,7 +206,7 @@ class PhotoDrawPath {
     }
     
     // Allow the path to be modified with a new path to fit to the new point data
-    func updatePath(newPath: Path) {
+    mutating func updatePath(newPath: Path) {
         self.path = newPath
     }
     

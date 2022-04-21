@@ -91,7 +91,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
     
     private var removePoint: CGPoint? = nil
     private var removePathPoints: [CGPoint]? = nil
-    private var pathsToBeDeleted = Set<PhotoDrawPath>()
+    private var pathsToBeDeleted = Set<UUID>()
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -256,7 +256,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             guard !state.isShowingPopover else { return }
             // Start a new path
             let path = PhotoDrawPath(path: Path(components: []), semanticColor: state.currentColor)
-            state.paths.append(path)
+            state.updatePaths(paths: [path])
             currentPath = ([currentPoint], path)
         case .selection:
             if state.hasSelection {
@@ -281,10 +281,11 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
                 return
             }
             currentPath.dataPoints.append(currentPoint)
-            self.currentPath = currentPath
             // Update bezier path to fit new data
             let newPath = CreatePath.pathFromPoints(currentPath.dataPoints)
             currentPath.path.updatePath(newPath: newPath)
+            self.currentPath = (currentPath.dataPoints, currentPath.path)
+            self.state.updatePaths(paths: [currentPath.path])
             let updateRect = newPath.boundingBox.cgRect
             let transformedRect = updateRect.applying(self.canvasTransform)
             let scaledRect = CGRect(x: transformedRect.minX - 2, y: transformedRect.minY - 2, width: transformedRect.width + 4, height: transformedRect.height + 4)
@@ -297,7 +298,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
                           width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
             }
             
-            let previousSelectedPathBox = state.selection?.reduce(into: CGRect?.none, { boundingBox, path in
+            let previousSelectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
                 guard let box = boundingBox else {
                     boundingBox = path.path.boundingBox.cgRect.applying(path.transform)
                     return
@@ -313,16 +314,21 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             
             if state.hasSelection {
                 self.selectTranslateEnd = currentPoint
-                guard let selection = state.selection, let translation = selectTranslation else { return }
+                let selection = state.selectedPaths
+                guard let translation = selectTranslation else { return }
                 // Update the translation for the selection
+                var updatedPaths = [PhotoDrawPath]()
                 for path in selection {
-                    path.transform(translation, commitTransform: false)
+                    var newPath = path
+                    newPath.transform(translation, commitTransform: false)
+                    updatedPaths.append(newPath)
                 }
+                self.state.updatePaths(paths: updatedPaths)
             } else {
                 self.selectEnd = currentPoint
             }
             
-            let selectedPathBox = state.selection?.reduce(into: CGRect?.none, { boundingBox, path in
+            let selectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
                 guard let box = boundingBox else {
                     boundingBox = path.path.boundingBox.cgRect.applying(path.transform)
                     return
@@ -357,10 +363,10 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             var updateRect = previousPointRect ?? removeRect
             
             for path in self.state.paths where path.path.boundingBox.cgRect.intersects(removeRect) && removePath.intersects(path.path) {
-                pathsToBeDeleted.insert(path)
+                pathsToBeDeleted.insert(path.id)
             }
             
-            let deletedPathsBox = pathsToBeDeleted.reduce(into: BoundingBox?.none, { boundingBox, path in
+            let deletedPathsBox = self.state.pathsForIdentifiers(ids: pathsToBeDeleted).reduce(into: BoundingBox?.none, { boundingBox, path in
                 guard let box = boundingBox else {
                     boundingBox = path.path.boundingBox
                     return
@@ -406,11 +412,16 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         case .selection:
             if state.hasSelection {
                 self.selectTranslateEnd = currentPoint
-                guard let selection = state.selection, let translation = selectTranslation else { return }
+                let selection = state.selectedPaths
+                guard let translation = selectTranslation else { return }
                 // Update the translation for the selection
+                var updatedPaths = [PhotoDrawPath]()
                 for path in selection {
-                    path.transform(translation, commitTransform: true)
+                    var newPath = path
+                    newPath.transform(translation, commitTransform: true)
+                    updatedPaths.append(newPath)
                 }
+                self.state.updatePaths(paths: updatedPaths)
                 self.selectTranslateStart = nil
                 self.selectTranslateEnd = nil
             } else {
@@ -432,9 +443,9 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
     
     private func finishSelection() {
         if let selectRect = selectRect {
-            var selection = [PhotoDrawPath]()
+            var selection = Set<UUID>()
             for path in self.state.paths where path.path.boundingBox.cgRect.intersects(selectRect) && path.path.intersectsOrContainedBy(rect: selectRect) {
-                selection.append(path)
+                selection.insert(path.id)
             }
             if selection.count >= 1 {
                 self.state.selection = selection
@@ -517,7 +528,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         for path in state.paths where path.path.boundingBox.cgRect.applying(path.transform).intersects(transformedRect) {
             
             // Paths that have been touched by the remove tool should have lower opacity
-            let color = pathsToBeDeleted.contains(path) ? path.color.color.withAlphaComponent(0.3).cgColor : path.color.color.cgColor
+            let color = pathsToBeDeleted.contains(path.id) ? path.color.color.withAlphaComponent(0.3).cgColor : path.color.color.cgColor
             
             context?.setFillColor(color)
             context?.setStrokeColor(color)
