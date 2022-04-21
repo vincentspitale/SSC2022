@@ -72,10 +72,9 @@ class ImagePathConverter {
     }
     
     private func findGroupedConnectedPixels() throws -> [Set<Point>] {
-        // Use covariance kernel to find lines in the image
-        guard let device = MTLCreateSystemDefaultDevice(), let cgImage = image.cgImage,         let library = device.makeDefaultLibrary() else { return [] }
-        let textureManager = TextureManager(device: device)
-        let covarianceFilter = try CorrelationKernel(cgImage: cgImage, library: library, textureManager: textureManager)
+        // Use covariance path detection kernel to find lines in the image
+        guard let cgImage = image.cgImage else { return [] }
+        let covarianceFilter = try PathDetectionKernel(cgImage: cgImage)
         let outputImage = try covarianceFilter.applyKernel()
         
         // This part could be slow
@@ -88,6 +87,7 @@ class ImagePathConverter {
             let startIndex = index * 4
             let r = outputData[startIndex]
             
+            // Check if the pixel is white
             guard r > 100 else { return }
             
             let x = index % Int(self.image.size.width)
@@ -528,7 +528,8 @@ fileprivate class TextureManager {
     }
 }
 
-fileprivate final class CorrelationKernel {
+/// Outputs a binary image of the pixels that are have a high probability of being a part of a parth
+fileprivate final class PathDetectionKernel {
     private let library: MTLLibrary
     private let textureManager: TextureManager
     private let imageTexture: MTLTexture
@@ -541,7 +542,9 @@ fileprivate final class CorrelationKernel {
     
     private var deviceSupportsNonuniformThreadgroups: Bool
     
-    init(cgImage: CGImage, library: MTLLibrary, textureManager: TextureManager) throws {
+    init(cgImage: CGImage) throws {
+        guard let device = MTLCreateSystemDefaultDevice(), let library = device.makeDefaultLibrary() else { throw MetalErrors.deviceCreationFailed }
+        let textureManager = TextureManager(device: device)
         self.library = library
         var brightness: CGFloat = 0
         (cgImage.averageColor ?? .white).getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
@@ -614,7 +617,7 @@ fileprivate final class CorrelationKernel {
                 lastImage = nextImage
                 return
             }
-            guard let combiner = try? CombineImage(cgImageOne: previousImage, cgImageTwo: nextImage, library: library, textureManager: textureManager) else { return }
+            guard let combiner = try? CombineImageKernel(cgImageOne: previousImage, cgImageTwo: nextImage, library: library, textureManager: textureManager) else { return }
             if let newImage = try? combiner.applyKernel() {
                 lastImage = newImage
             }
@@ -622,23 +625,23 @@ fileprivate final class CorrelationKernel {
             throw MetalErrors.kernelFailed
         }
         
-        let binaryFilter = try BinaryImage(cgImage: combinedImage, library: library, textureManager: textureManager)
+        let binaryFilter = try BinaryImageKernel(cgImage: combinedImage, library: library, textureManager: textureManager)
         
         let binaryImage = try binaryFilter.getBinaryImage()
         
         let originalImage = try textureManager.cgImage(texture: self.imageTexture)
-        let averageBrightnessFilter = try FilterNearAverage(cgImageOne: originalImage, cgImageTwo: binaryImage, averageBrightness: averageBrightness, library: library, textureManager: textureManager)
+        let averageBrightnessFilter = try FilterNearAverageKernel(cgImageOne: originalImage, cgImageTwo: binaryImage, averageBrightness: averageBrightness, library: library, textureManager: textureManager)
         
         let filteredImage = try averageBrightnessFilter.applyKernel()
         
-        let addMissingPixels = try AddMissingPixels(cgImageOne: originalImage, cgImageTwo: filteredImage, averageBrightness: averageBrightness, library: library, textureManager: textureManager)
+        let addMissingPixels = try RecoverMissingPixelsKernel(cgImageOne: originalImage, cgImageTwo: filteredImage, averageBrightness: averageBrightness, library: library, textureManager: textureManager)
         
         let recoveredImage = try addMissingPixels.applyKernel()
         
         return recoveredImage
     }
     
-    fileprivate final class CombineImage {
+    final class CombineImageKernel {
         private let textureManager: TextureManager
         private let inputTextureOne: MTLTexture
         private let inputTextureTwo: MTLTexture
@@ -707,7 +710,7 @@ fileprivate final class CorrelationKernel {
         
     }
     
-    fileprivate final class BinaryImage {
+    final class BinaryImageKernel {
         private let textureManager: TextureManager
         private let inputTexture: MTLTexture
         private let outputTexture: MTLTexture
@@ -772,7 +775,7 @@ fileprivate final class CorrelationKernel {
         }
     }
     
-    fileprivate final class FilterNearAverage {
+    final class FilterNearAverageKernel {
         private let textureManager: TextureManager
         private let inputTextureOne: MTLTexture
         private let inputTextureTwo: MTLTexture
@@ -845,7 +848,7 @@ fileprivate final class CorrelationKernel {
     }
     
     
-    fileprivate final class AddMissingPixels {
+    final class RecoverMissingPixelsKernel {
         private let textureManager: TextureManager
         private let inputTextureOne: MTLTexture
         private let inputTextureTwo: MTLTexture
@@ -921,6 +924,7 @@ fileprivate final class CorrelationKernel {
 }
 
 fileprivate enum MetalErrors: Error {
+    case deviceCreationFailed
     case encoderCreationFailed
     case commandQueueCreationFailed
     case commandBufferCreationFailed

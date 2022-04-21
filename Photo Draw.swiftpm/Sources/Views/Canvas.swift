@@ -340,7 +340,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             
             if let updateRect = updateSelectRect {
                 let transformedRect = updateRect.applying(self.canvasTransform)
-                let scaledRect = CGRect(x: transformedRect.minX - 3, y: transformedRect.minY - 3, width: transformedRect.width + 6, height: transformedRect.height + 6)
+                let scaledRect = CGRect(x: transformedRect.minX - 20, y: transformedRect.minY - 20, width: transformedRect.width + 40, height: transformedRect.height + 40)
                 self.setNeedsDisplay(scaledRect)
             }
         case .remove:
@@ -491,23 +491,28 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         }
         
         
+        // Draw selection around selected paths bounding box
+        let selectionBoundingBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
+            guard let box = boundingBox else {
+                boundingBox = path.path.boundingBox.cgRect.applying(path.transform)
+                return
+            }
+            boundingBox = box.union(path.path.boundingBox.cgRect.applying(path.transform))
+        })
+        
+        if let selectionBoundingBox = selectionBoundingBox {
+            let largerBox = CGRect(x: selectionBoundingBox.minX - 10, y: selectionBoundingBox.minY - 10, width: selectionBoundingBox.width + 20, height: selectionBoundingBox.height + 20)
+            let path = UIBezierPath(roundedRect: largerBox, cornerRadius: 5)
+            context?.setFillColor(UIColor.clear.cgColor)
+            context?.setStrokeColor(AppColors.accent.withAlphaComponent(0.3).cgColor)
+            context?.setLineWidth(2)
+            context?.addPath(path.cgPath)
+            context?.drawPath(using: .stroke)
+            context?.strokePath()
+        }
+        
         // Draw all bezier paths
         for path in state.paths where path.path.boundingBox.cgRect.intersects(rect) {
-            // Draw selection border around selected paths
-            if state.selectedPaths.contains(path) {
-                context?.setFillColor(AppColors.accent.cgColor)
-                context?.setStrokeColor(AppColors.accent.cgColor)
-                context?.setLineWidth(5)
-                // Apply in-progress transform
-                let pathTransform = path.transform
-                context?.concatenate(pathTransform)
-                context?.addPath(path.path.cgPath)
-                context?.drawPath(using: .fillStroke)
-                context?.strokePath()
-                // Undo in-progress transform
-                context?.concatenate(pathTransform.inverted())
-            }
-            
             
             // Paths that have been touched by the remove tool should have lower opacity
             let color = pathsToBeDeleted.contains(path) ? path.color.color.withAlphaComponent(0.3).cgColor : path.color.color.cgColor
