@@ -144,7 +144,7 @@ enum PhotoMode {
 class PhotoDrawPath {
     var path: Path
     var color: SemanticColor
-    var transform: CGAffineTransform?
+    var transform: CGAffineTransform
     
     init(path: Path, color: UIColor) {
         self.path = path

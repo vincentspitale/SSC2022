@@ -103,6 +103,11 @@ struct DrawView: View {
                         } else {
                             Text("Finding paths")
                                 .foregroundColor(.accentColor)
+                                .padding()
+                                .background(
+                                    Rectangle().fill(Color(uiColor: UIColor.systemGray6))
+                                            .blur(radius: 10)
+                                    )
                         }
                     }
                 .frame(minWidth: nil, idealWidth: toolWidth, maxWidth: toolWidth, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)

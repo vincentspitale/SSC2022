@@ -25,6 +25,7 @@ class ImagePathConverter {
     
     let image: UIImage
     
+    // Aproximately 4 seconds
     private lazy var groupedConnectedPixels: [Set<Point>] = {
         let groups = try? self.findGroupedConnectedPixels()
         return groups ?? []
