@@ -10,11 +10,14 @@ struct ContentView: View {
     
     var body: some View {
         ZStack{
+            DrawView(windowState: windowState)
+                .disabled(isShowingWelcome)
+                .accessibilityHidden(isShowingWelcome)
             if isShowingWelcome {
+            Rectangle()
+                .foregroundColor(Color(uiColor: UIColor.systemBackground))
+                .ignoresSafeArea()
                 WelcomeView(windowState: windowState)
-            }
-            if !isShowingWelcome {
-                DrawView(windowState: windowState)
             }
         }
     }

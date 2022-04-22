@@ -38,6 +38,7 @@ struct DrawView: View {
     var body: some View {
         ZStack{
             LibraryPhotoPickerView(windowState: windowState)
+            CameraScanView(windowState: windowState)
             Rectangle()
                 .foregroundColor(Color(uiColor: UIColor.systemGray6))
                 .transition(.opacity)
