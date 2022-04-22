@@ -78,7 +78,7 @@ class WindowState: ObservableObject {
     // Notify when the image conversion has completed
     var imageCancellable: AnyCancellable? = nil
 
-    
+    // Used to know where to place the image
     weak var canvas: Canvas? = nil
     
     var hasSelection: Bool {
@@ -127,7 +127,7 @@ class WindowState: ObservableObject {
         self.currentCanvas = currentCanvas
     }
     
-    func pathsForIdentifiers(ids: Set<UUID>) -> [PhotoDrawPath] {
+    func pathsForIdentifiers(_ ids: Set<UUID>) -> [PhotoDrawPath] {
         return ids.compactMap { id in
             return self.currentCanvas.paths[id]
         }
@@ -332,6 +332,7 @@ enum SemanticColor: CaseIterable, Comparable {
         }
     }
     
+    /// Find the closest color that adapts to light and dark mode for the given color
     public static func colorToSemanticColor(color: UIColor) -> SemanticColor {
         var hue: CGFloat = 0.0
         var saturation: CGFloat = 0.0
@@ -346,11 +347,11 @@ enum SemanticColor: CaseIterable, Comparable {
         
         color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
         
-        // Have only a few color match options to prevent incorrect conversions
-        // Use colors that are independent of system theme, light or dark mode
+        // Using colors that are independent of the system theme, light or dark mode
         let red = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)
         let green = #colorLiteral(red: 0, green: 1, blue: 0, alpha: 1)
         let blue = #colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)
+        // Have only a few color match options to prevent incorrect conversions
         let supportedColors: [(SemanticColor, UIColor)] = [(SemanticColor.red, red), (SemanticColor.green, green), (SemanticColor.blue, blue)]
         let closestColor: (SemanticColor, CGFloat)? = supportedColors.reduce(into: nil, { nearestColor, color in
             var colorR: CGFloat = 0.0

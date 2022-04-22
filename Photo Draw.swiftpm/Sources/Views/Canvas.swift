@@ -53,6 +53,7 @@ class Canvas: UIViewController {
         }   
     }
 
+    /// Find where the center of the screen is in canvas space
     func getCenterScreenCanvasPosition() async -> CGPoint {
         let screen = await MainActor.run { () -> CGRect in
             return self.view.bounds
@@ -281,12 +282,14 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             currentPath.path.updatePath(newPath: newPath)
             self.currentPath = (currentPath.dataPoints, currentPath.path)
             self.state.updatePaths(paths: [currentPath.path])
+            // Find what area of the screen is updating
             let updateRect = newPath.boundingBox.cgRect
             let transformedRect = updateRect.applying(self.canvasTransform)
             let scaledRect = CGRect(x: transformedRect.minX - 2, y: transformedRect.minY - 2, width: transformedRect.width + 4, height: transformedRect.height + 4)
             
             self.setNeedsDisplay(scaledRect)
         case .selection:
+            // Find what area of the screen is updating
             var updateSelectRect: CGRect?
             if let selectStart = selectStart, let selectEnd = selectEnd {
             updateSelectRect = CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
@@ -295,17 +298,16 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             
             let previousSelectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
                 guard let box = boundingBox else {
-                    boundingBox = path.path.boundingBox.cgRect.applying(path.transform)
+                    boundingBox = path.boundingBox()
                     return
                 }
-                let pathBox = path.path.boundingBox.cgRect.applying(path.transform)
+                let pathBox = path.boundingBox()
                 boundingBox = pathBox.union(box)
             })
             
             if let previousSelectedPathBox = previousSelectedPathBox {
                 updateSelectRect = updateSelectRect?.union(previousSelectedPathBox) ?? previousSelectedPathBox
             }
-            
             
             if state.hasSelection {
                 self.selectTranslateEnd = currentPoint
@@ -325,10 +327,10 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             
             let selectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
                 guard let box = boundingBox else {
-                    boundingBox = path.path.boundingBox.cgRect.applying(path.transform)
+                    boundingBox = path.boundingBox()
                     return
                 }
-                let pathBox = path.path.boundingBox.cgRect.applying(path.transform)
+                let pathBox = path.boundingBox()
                 boundingBox = pathBox.union(box)
             })
             
@@ -355,13 +357,14 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             let removePath = CreatePath.pathFromPoints(removePathPoints)
             let removeRect = CGRect(x: currentPoint.x - 5, y: currentPoint.y - 5, width: 10, height: 10)
             
+            // Find what area of the screen is updating
             var updateRect = previousPointRect ?? removeRect
             
-            for path in self.state.paths where path.path.boundingBox.cgRect.intersects(removeRect) && removePath.intersects(path.path) {
+            for path in self.state.paths where path.boundingBox().intersects(removeRect) && removePath.intersects(path.path) {
                 pathsToBeDeleted.insert(path.id)
             }
             
-            let deletedPathsBox = self.state.pathsForIdentifiers(ids: pathsToBeDeleted).reduce(into: BoundingBox?.none, { boundingBox, path in
+            let deletedPathsBox = self.state.pathsForIdentifiers(pathsToBeDeleted).reduce(into: BoundingBox?.none, { boundingBox, path in
                 guard let box = boundingBox else {
                     boundingBox = path.path.boundingBox
                     return
@@ -394,17 +397,33 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         let currentPoint = translatedPoint(touch.location(in: self))
         switch self.state.currentTool {
         case .pen:
-            guard var currentPath = currentPath else {
-                return
-            }
-            currentPath.dataPoints.append(currentPoint)
-            self.currentPath = currentPath
-            // Update bezier path to fit new data
-            let newPath = CreatePath.pathFromPoints(currentPath.dataPoints)
-            currentPath.path.updatePath(newPath: newPath)
-            
+            guard let currentPath = currentPath else { return }
+            let updateRect = currentPath.path.boundingBox()
+            let transformedRect = updateRect.applying(self.canvasTransform)
+            let scaledRect = CGRect(x: transformedRect.minX - 2, y: transformedRect.minY - 2, width: transformedRect.width + 4, height: transformedRect.height + 4)
             self.finishPath()
+            self.setNeedsDisplay(scaledRect)
         case .selection:
+            // Find what area of the screen is updating
+            var updateSelectRect: CGRect?
+            if let selectStart = selectStart, let selectEnd = selectEnd {
+            updateSelectRect = CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
+                          width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
+            }
+            
+            let previousSelectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
+                guard let box = boundingBox else {
+                    boundingBox = path.boundingBox()
+                    return
+                }
+                let pathBox = path.boundingBox()
+                boundingBox = pathBox.union(box)
+            })
+            
+            if let previousSelectedPathBox = previousSelectedPathBox {
+                updateSelectRect = updateSelectRect?.union(previousSelectedPathBox) ?? previousSelectedPathBox
+            }
+            
             if state.hasSelection {
                 self.selectTranslateEnd = currentPoint
                 let selection = state.selectedPaths
@@ -423,13 +442,50 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
                 self.selectEnd = currentPoint
                 self.finishSelection()
             }
+            
+            let selectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
+                guard let box = boundingBox else {
+                    boundingBox = path.boundingBox()
+                    return
+                }
+                let pathBox = path.boundingBox()
+                boundingBox = pathBox.union(box)
+            })
+            
+            if let selectedPathBox = selectedPathBox {
+                updateSelectRect = updateSelectRect?.union(selectedPathBox) ?? selectedPathBox
+            }
+            if let selectRect = selectRect {
+                updateSelectRect = updateSelectRect?.union(selectRect) ?? selectRect
+            }
+            
+            if let updateRect = updateSelectRect {
+                let transformedRect = updateRect.applying(self.canvasTransform)
+                let scaledRect = CGRect(x: transformedRect.minX - 20, y: transformedRect.minY - 20, width: transformedRect.width + 40, height: transformedRect.height + 40)
+                self.setNeedsDisplay(scaledRect)
+            }
         case .remove:
+            // Find what area of the screen is updating
+            var updateRect = CGRect(x: currentPoint.x - 5, y: currentPoint.y - 5, width: 10, height: 10)
+            let deletedPathsBox = self.state.pathsForIdentifiers(pathsToBeDeleted).reduce(into: BoundingBox?.none, { boundingBox, path in
+                guard let box = boundingBox else {
+                    boundingBox = path.path.boundingBox
+                    return
+                }
+                var pathBox = path.path.boundingBox
+                pathBox.union(box)
+                boundingBox = pathBox
+            })
+            if let deletedPathsBox = deletedPathsBox {
+                updateRect = updateRect.union(deletedPathsBox.cgRect)
+            }
+            let transformedRect = updateRect.applying(self.canvasTransform)
+            let scaledRect = CGRect(x: transformedRect.minX - 5, y: transformedRect.minY - 5, width: transformedRect.width + 10, height: transformedRect.height + 10)
             self.finishRemove()
+            self.setNeedsDisplay(scaledRect)
         default:
             break
         }
-        
-        self.setNeedsDisplay()
     }
     
     private func finishPath() {
@@ -439,7 +495,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
     private func finishSelection() {
         if let selectRect = selectRect {
             var selection = Set<UUID>()
-            for path in self.state.paths where path.path.boundingBox.cgRect.intersects(selectRect) && path.path.intersectsOrContainedBy(rect: selectRect) {
+            for path in self.state.paths where path.boundingBox().intersects(selectRect) && path.path.intersectsOrContainedBy(rect: selectRect) {
                 selection.insert(path.id)
             }
             if selection.count >= 1 {
@@ -502,10 +558,10 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         // Draw selection around selected paths bounding box
         let selectionBoundingBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
             guard let box = boundingBox else {
-                boundingBox = path.path.boundingBox.cgRect.applying(path.transform)
+                boundingBox = path.boundingBox()
                 return
             }
-            boundingBox = box.union(path.path.boundingBox.cgRect.applying(path.transform))
+            boundingBox = box.union(path.boundingBox())
         })
         
         if let selectionBoundingBox = selectionBoundingBox {
@@ -520,7 +576,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         }
         
         // Draw all bezier paths
-        for path in state.paths where path.path.boundingBox.cgRect.applying(path.transform).intersects(transformedRect) {
+        for path in state.paths where path.boundingBox().intersects(transformedRect) {
             
             // Paths that have been touched by the remove tool should have lower opacity
             let color = pathsToBeDeleted.contains(path.id) ? path.color.color.withAlphaComponent(0.3).cgColor : path.color.color.cgColor
@@ -548,6 +604,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             rect = rect.applying(imageScale)
             rect = rect.applying(imageConversion.translateTransform)
             rect = rect.applying(imageTranslation)
+            // The image needs to be flipped vertically
             context?.saveGState()
             context?.translateBy(x: 0, y: rect.origin.y + rect.height)
             context?.scaleBy(x: 1, y: -1)
