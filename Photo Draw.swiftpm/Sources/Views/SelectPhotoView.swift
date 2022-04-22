@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SelectPhotoView: View {
-    @ObservedObject var windowState: CanvasState
+    @ObservedObject var windowState: WindowState
     
     var body: some View {
         VStack{
@@ -117,7 +117,7 @@ struct SelectPhotoView: View {
 
 struct SelectPhotoView_Previews: PreviewProvider {
     static var previews: some View {
-        SelectPhotoView(windowState: CanvasState())
+        SelectPhotoView(windowState: WindowState())
             .preferredColorScheme(.dark)
             .previewInterfaceOrientation(.landscapeLeft)
     }

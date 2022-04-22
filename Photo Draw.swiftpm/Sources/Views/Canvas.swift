@@ -12,10 +12,10 @@ import UIKit
 import SwiftUI
 
 class Canvas: UIViewController {
-    var state: CanvasState
+    var state: WindowState
     var renderView: RenderView? = nil
     
-    init(state: CanvasState) {
+    init(state: WindowState) {
         self.state = state
         super.init(nibName: nil, bundle: nil)
         state.canvas = self
@@ -67,8 +67,7 @@ class Canvas: UIViewController {
 }
 
 class RenderView: UIView, UIGestureRecognizerDelegate {
-    private var state: CanvasState
-    private var drawingLayer: CALayer?
+    private var state: WindowState
     
     // Move canvas
     var canvasTransform: CGAffineTransform = .identity
@@ -114,7 +113,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
     var pinchGesture: UIPinchGestureRecognizer?
     var panGesture: UIPanGestureRecognizer?
     
-    init(state: CanvasState, frame: CGRect) {
+    init(state: WindowState, frame: CGRect) {
         self.state = state
         super.init(frame: frame)
         self.backgroundColor = .clear
@@ -146,10 +145,6 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         pan.delegate = self
         self.panGesture = pan
         self.addGestureRecognizer(pan)
-        let sublayer = CALayer()
-        sublayer.contentsScale = UIScreen.main.scale
-        layer.addSublayer(sublayer)
-        self.drawingLayer = sublayer
     }
     
     @available(*, unavailable)
@@ -583,7 +578,7 @@ class AppColors {
 }
 
 struct CanvasView: UIViewControllerRepresentable {
-    @ObservedObject var windowState: CanvasState
+    @ObservedObject var windowState: WindowState
     
     func makeUIViewController(context: Context) -> UIViewController {
         Canvas(state: windowState)

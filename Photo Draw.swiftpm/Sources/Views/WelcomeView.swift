@@ -15,7 +15,7 @@ enum WelcomeState {
 }
 
 struct WelcomeView: View {
-    @ObservedObject var windowState: CanvasState
+    @ObservedObject var windowState: WindowState
     @State var welcomeState: WelcomeState = .welcomeMessage
     
     var body: some View {
@@ -121,9 +121,9 @@ struct WelcomeMessageView: View {
 struct WelcomeView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            WelcomeView(windowState: CanvasState())
+            WelcomeView(windowState: WindowState())
                 .previewInterfaceOrientation(.landscapeLeft)
-            WelcomeView(windowState: CanvasState())
+            WelcomeView(windowState: WindowState())
                 .preferredColorScheme(.dark)
                 .previewInterfaceOrientation(.landscapeLeft)
         }

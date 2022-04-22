@@ -12,10 +12,40 @@ import SwiftUI
 import simd
 
 @MainActor
-class CanvasState: ObservableObject {
+class WindowState: ObservableObject {
     // Strokes that are on the canvas
-    private var currentPathState: (paths: [UUID : PhotoDrawPath], order: [UUID]) = ([:], [])
-    private var previousPathState: (paths: [UUID : PhotoDrawPath], order: [UUID])?
+    private var currentCanvas: CanvasState = CanvasState() {
+        willSet {
+            self.previousCanvas = currentCanvas
+        }
+    }
+    private var previousCanvas: CanvasState = CanvasState()
+    
+    var updatedCanvasRect: CGRect? {
+        var differingPaths = [PhotoDrawPath]()
+        let currentCanvas = self.currentCanvas
+        let previousCanvas = self.previousCanvas
+        for (key, path) in currentCanvas.paths {
+            let path2 = previousCanvas.paths[key]
+            if path != path2 {
+                differingPaths.append(path)
+            }
+        }
+        for (key, path) in previousCanvas.paths {
+            let path2 = currentCanvas.paths[key]
+            if path != path2 {
+                differingPaths.append(path)
+            }
+        }
+        return differingPaths.reduce(into: CGRect?.none, { box, path in
+            guard let lastBoundingBox = box else {
+                box = path.path.boundingBox.cgRect
+                return
+            }
+            box = lastBoundingBox.union(path.boundingBox())
+        })
+    }
+    
     // The color of the pen tool
     @Published var currentColor: SemanticColor = .primary
     @Published var currentTool: CanvasTool = .pen {
@@ -44,10 +74,10 @@ class CanvasState: ObservableObject {
     @Published var isShowingPenColorPicker: Bool = false
     @Published var isShowingSelectionColorPicker: Bool = false
     @Published var photoMode: PhotoMode = .welcome
-    
     var imageConversion: ImageConversion? = nil
-    // Notify when the image convdrsion has completed
+    // Notify when the image conversion has completed
     var imageCancellable: AnyCancellable? = nil
+
     
     weak var canvas: Canvas? = nil
     
@@ -62,7 +92,7 @@ class CanvasState: ObservableObject {
     var selectedPaths: [PhotoDrawPath] {
         guard let selection = selection else { return [] }
         return selection.compactMap { id in
-            self.currentPathState.paths[id]
+            self.currentCanvas.paths[id]
         }
     }
     
@@ -73,8 +103,8 @@ class CanvasState: ObservableObject {
     }
     
     var paths: [PhotoDrawPath] {
-        self.currentPathState.order.compactMap { id in
-            return self.currentPathState.paths[id]
+        self.currentCanvas.order.compactMap { id in
+            return self.currentCanvas.paths[id]
         }
     }
     
@@ -84,20 +114,22 @@ class CanvasState: ObservableObject {
     
     func updatePaths(paths: [PhotoDrawPath]) {
         var newPaths = [PhotoDrawPath]()
+        var currentCanvas = currentCanvas
         for path in paths {
-            if self.currentPathState.paths[path.id] == nil {
+            if currentCanvas.paths[path.id] == nil {
                 newPaths.append(path)
             }
-            self.currentPathState.paths[path.id] = path
+            currentCanvas.paths[path.id] = path
         }
         for newPath in newPaths {
-            self.currentPathState.order.append(newPath.id)
+            currentCanvas.order.append(newPath.id)
         }
+        self.currentCanvas = currentCanvas
     }
     
     func pathsForIdentifiers(ids: Set<UUID>) -> [PhotoDrawPath] {
         return ids.compactMap { id in
-            return self.currentPathState.paths[id]
+            return self.currentCanvas.paths[id]
         }
     }
     
@@ -125,10 +157,12 @@ class CanvasState: ObservableObject {
     }
     
     func removePaths(_ removeSet: Set<UUID>) {
+        var currentCanvas = self.currentCanvas
         for id in removeSet {
-            self.currentPathState.paths.removeValue(forKey: id)
+            currentCanvas.paths.removeValue(forKey: id)
         }
-        self.currentPathState.order = self.currentPathState.order.filter { !removeSet.contains($0)}
+        currentCanvas.order = self.currentCanvas.order.filter { !removeSet.contains($0)}
+        self.currentCanvas = currentCanvas
     }
     
     func startConversion(image: UIImage) async {
@@ -210,6 +244,10 @@ struct PhotoDrawPath: Identifiable {
         self.path = newPath
     }
     
+    func boundingBox() -> CGRect {
+        self.path.boundingBox.cgRect.applying(self.transform)
+    }
+    
 }
 
 extension PhotoDrawPath: Equatable, Hashable {
@@ -221,6 +259,22 @@ extension PhotoDrawPath: Equatable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(path)
         hasher.combine(color)
+    }
+}
+
+struct CanvasState {
+    var paths: [UUID : PhotoDrawPath] = [:]
+    var order: [UUID] = []
+}
+
+extension CanvasState: Equatable, Hashable {
+    static func == (lhs: CanvasState, rhs: CanvasState) -> Bool {
+        lhs.paths == rhs.paths &&
+        lhs.order == rhs.order
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(paths)
+        hasher.combine(order)
     }
 }
 
@@ -340,7 +394,7 @@ enum SemanticColor: CaseIterable, Comparable {
 
 class ImageConversion: ObservableObject {
     let image: UIImage
-    private var paths: [PhotoDrawPath]? = nil
+    @Published var paths: [PhotoDrawPath]? = nil
     
     lazy var scaleTransform: CGAffineTransform = {
         // Initially fit the image within a 400 point square
@@ -389,8 +443,6 @@ class ImageConversion: ObservableObject {
             self.paths = convertedPaths.map { (path, color) -> PhotoDrawPath in
                 return PhotoDrawPath(path: path, color: color)
             }
-            // Notify that the image has been converted
-            self.objectWillChange.send()
         }
     }
     

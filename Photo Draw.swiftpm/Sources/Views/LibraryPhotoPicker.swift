@@ -12,11 +12,11 @@ import SwiftUI
 import PhotosUI
 
 class LibraryPhotoPicker: UIViewController, PHPickerViewControllerDelegate {
-    let state: CanvasState
+    let state: WindowState
     var cancellable: AnyCancellable? = nil
     var imagePicker: PHPickerViewController? = nil
     
-    init(state: CanvasState) {
+    init(state: WindowState) {
         self.state = state
         super.init(nibName: nil, bundle: nil)
     }
@@ -60,7 +60,7 @@ class LibraryPhotoPicker: UIViewController, PHPickerViewControllerDelegate {
 }
     
 struct LibraryPhotoPickerView: UIViewControllerRepresentable {
-    @ObservedObject var windowState: CanvasState
+    @ObservedObject var windowState: WindowState
     
     func makeUIViewController(context: Context) -> UIViewController {
         LibraryPhotoPicker(state: windowState)

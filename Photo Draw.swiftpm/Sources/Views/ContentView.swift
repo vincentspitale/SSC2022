@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     // Each window scene has its own canvas
-    @StateObject var windowState = CanvasState()
+    @StateObject var windowState = WindowState()
     
     var isShowingWelcome: Bool {
         windowState.photoMode == .welcome

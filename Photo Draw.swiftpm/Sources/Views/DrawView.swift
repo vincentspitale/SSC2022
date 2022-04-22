@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 struct DrawView: View {
-    @ObservedObject var windowState: CanvasState
+    @ObservedObject var windowState: WindowState
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Environment(\.colorScheme) var colorScheme
     
