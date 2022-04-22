@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    // Each window scene has its own canvas
+    // Each window scene has its own state and canvas
     @StateObject var windowState = WindowState()
     
     var isShowingWelcome: Bool {

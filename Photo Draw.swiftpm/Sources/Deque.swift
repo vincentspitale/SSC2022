@@ -48,7 +48,7 @@ fileprivate class ANode<T>: NodeProtocol {
     typealias T = T
     typealias U = ANode<T>
     
-    var next: U? = nil
+    weak var next: U? = nil
     var prev: U? = nil
     
     // By default removing a node does nothing

@@ -159,8 +159,24 @@ kernel void differs_from_average_brightness(texture2d<float, access::read> inTex
     
     const float brightness = luminance(sampleOriginal.rgb);
     
+    // Find the average brightness of the surrounding area
+    int size = 64;
+    int sampleCount = 0;
+    float sampleSumBrightness = 0.0;
+    for (int i = max(0, int(position.x) - size); i < min(int(textureSize.x), int(position.x) + size); i++) {
+        for (int j = max(0, int(position.y) - size); j < min(int(textureSize.y), int(position.y) + size); j++) {
+            sampleCount += 1;
+            const auto sampleBinary = inTexture.read(uint2(i,j));
+            float brightness = luminance(sampleBinary.rgb);
+            sampleSumBrightness += brightness;
+        }
+    }
+    
+    float areaBrightness = sampleSumBrightness / float(sampleCount);
+    float weightedBrightness = averageBrightness * 0.7 + areaBrightness * 0.3;
+    
     float4 black(0, 0, 0, 1);
-    if (abs(brightness - averageBrightness) < 0.20) {
+    if (abs(brightness - weightedBrightness) < 0.20) {
         outTexture.write(black, position);
     } else {
         outTexture.write(sampleBinary, position);
@@ -185,6 +201,7 @@ kernel void add_missing_pixels(texture2d<float, access::read> inTexture [[textur
     
     int size = 8;
     
+    // Find if this pixel is near a stroke pixel
     bool containsWhite = false;
     
     for (int i = max(0, int(position.x) - size); i < min(int(textureSize.x), int(position.x) + size); i++) {
@@ -197,13 +214,28 @@ kernel void add_missing_pixels(texture2d<float, access::read> inTexture [[textur
         }
     }
     
+    // Find the average brightness of the surrounding area
+    size = 64;
+    int sampleCount = 0;
+    float sampleSumBrightness = 0.0;
+    for (int i = max(0, int(position.x) - size); i < min(int(textureSize.x), int(position.x) + size); i++) {
+        for (int j = max(0, int(position.y) - size); j < min(int(textureSize.y), int(position.y) + size); j++) {
+            sampleCount += 1;
+            const auto sampleBinary = inTexture.read(uint2(i,j));
+            float brightness = luminance(sampleBinary.rgb);
+            sampleSumBrightness += brightness;
+        }
+    }
+    
+    float areaBrightness = sampleSumBrightness / float(sampleCount);
+    float weightedBrightness = averageBrightness * 0.7 + areaBrightness * 0.3;
+    
     const auto sampleOriginal = inTexture.read(position);
     const auto sampleBinary = inTextureTwo.read(position);
-    
     const float brightness = luminance(sampleOriginal.rgb);
     
     float4 white(1, 1, 1, 1);
-    if (abs(brightness - averageBrightness) < 0.20) {
+    if (abs(brightness - weightedBrightness) < 0.20) {
         outTexture.write(sampleBinary, position);
     } else if (containsWhite) {
         outTexture.write(white, position);

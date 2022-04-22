@@ -9,9 +9,7 @@ import Foundation
 import Combine
 import UIKit
 import SwiftUI
-import simd
 
-@MainActor
 class WindowState: ObservableObject {
     // Strokes that are on the canvas
     private var currentCanvas: CanvasState = CanvasState() {

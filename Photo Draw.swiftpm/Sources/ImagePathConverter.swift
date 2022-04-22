@@ -25,12 +25,14 @@ class ImagePathConverter {
     
     let image: UIImage
     
-    // Aproximately 4 seconds
+    // All continuous stroke pixels separated into groups
     private lazy var groupedConnectedPixels: [Set<Point>] = {
         let groups = try? self.findGroupedConnectedPixels()
         return groups ?? []
     }()
     
+    // The center line representation of each continuous stroke pixel group.
+    // Each is a path of pixels with width 1.
     private lazy var centerLines: [Set<Point>] = {
         self.findCenterLines()
     }()
@@ -77,11 +79,13 @@ class ImagePathConverter {
         let covarianceFilter = try PathDetectionKernel(cgImage: cgImage)
         let outputImage = try covarianceFilter.applyKernel()
         
-        // This part could be slow
+        // Find the position of all of the white pixels
         let size = self.image.size
         guard let outputData = UIImage(cgImage: outputImage).rgbaPixelData() else { return [] }
         let numPixels: Int = Int(size.width) * Int(size.height)
         var growingStrokePixelArray = [Point]()
+        // Since we are doing this operation in parallel, access to the stroke pixel array
+        // must be limited to one thread at a time
         let semaphore = DispatchSemaphore(value: 1)
         DispatchQueue.concurrentPerform(iterations: numPixels) { index in
             let startIndex = index * 4
@@ -485,6 +489,7 @@ fileprivate class TextureManager {
         self.textureLoader = MTKTextureLoader(device: device)
     }
     
+    /// Create a texture from an image
     func texture(cgImage: CGImage, usage: MTLTextureUsage = [.shaderRead, .shaderWrite]) throws -> MTLTexture {
         let options: [MTKTextureLoader.Option : Any] = [
             .textureUsage: NSNumber(value: usage.rawValue),
@@ -494,6 +499,7 @@ fileprivate class TextureManager {
         return try self.textureLoader.newTexture(cgImage: cgImage, options: options)
     }
     
+    /// Get an image from the given texture
     func cgImage(texture: MTLTexture) throws -> CGImage {
         let bytesPerRow = texture.width * 4 // r,g,b,a
         let bytesLength = bytesPerRow * texture.height
@@ -515,6 +521,7 @@ fileprivate class TextureManager {
         return cgImage
     }
     
+    /// Create a texture with the same width and height
     func createMatchingTexture(texture: MTLTexture) throws -> MTLTexture {
         let descriptor = MTLTextureDescriptor()
         descriptor.width = texture.width
@@ -625,15 +632,19 @@ fileprivate final class PathDetectionKernel {
             throw MetalErrors.kernelFailed
         }
         
+        // Make the image pixels either black or white depending on their line confidence
         let binaryFilter = try BinaryImageKernel(cgImage: combinedImage, library: library, textureManager: textureManager)
         
         let binaryImage = try binaryFilter.getBinaryImage()
         
+        // Remove pixels that do not vary enough from the average color or their surrounding pixels
         let originalImage = try textureManager.cgImage(texture: self.imageTexture)
+        
         let averageBrightnessFilter = try FilterNearAverageKernel(cgImageOne: originalImage, cgImageTwo: binaryImage, averageBrightness: averageBrightness, library: library, textureManager: textureManager)
         
         let filteredImage = try averageBrightnessFilter.applyKernel()
         
+        // Add pixels that are near white pixels and do vary enough from the average color or their surrounding pixels
         let addMissingPixels = try RecoverMissingPixelsKernel(cgImageOne: originalImage, cgImageTwo: filteredImage, averageBrightness: averageBrightness, library: library, textureManager: textureManager)
         
         let recoveredImage = try addMissingPixels.applyKernel()
@@ -641,6 +652,7 @@ fileprivate final class PathDetectionKernel {
         return recoveredImage
     }
     
+    /// Combine two covariance kernel images to output whichever line probability is more confident for every pixel.
     final class CombineImageKernel {
         private let textureManager: TextureManager
         private let inputTextureOne: MTLTexture
@@ -710,6 +722,8 @@ fileprivate final class PathDetectionKernel {
         
     }
     
+    /// Filter the image to have white pixels be pixels that have a high confidence to be part of a line
+    /// and black to be those that are not.
     final class BinaryImageKernel {
         private let textureManager: TextureManager
         private let inputTexture: MTLTexture
@@ -775,6 +789,7 @@ fileprivate final class PathDetectionKernel {
         }
     }
     
+    /// Remove pixels that do not vary enough from their surroundings and the average color
     final class FilterNearAverageKernel {
         private let textureManager: TextureManager
         private let inputTextureOne: MTLTexture
@@ -919,8 +934,6 @@ fileprivate final class PathDetectionKernel {
         }
         
     }
-    
-    
 }
 
 fileprivate enum MetalErrors: Error {
@@ -943,7 +956,7 @@ fileprivate extension CGImage {
         guard let outputImage = filter.outputImage else { return nil }
 
         var bitmap = [UInt8](repeating: 0, count: 4)
-        let context = CIContext(options: [.workingColorSpace: kCFNull])
+        let context = CIContext(options: [.workingColorSpace: kCFNull as Any])
         context.render(outputImage, toBitmap: &bitmap, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: nil)
 
         return UIColor(red: CGFloat(bitmap[0]) / 255, green: CGFloat(bitmap[1]) / 255, blue: CGFloat(bitmap[2]) / 255, alpha: CGFloat(bitmap[3]) / 255)
