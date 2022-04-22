@@ -38,7 +38,7 @@ struct LearnToolsView: View {
                                 .font(.title2).bold()
                                     .foregroundColor(.accentColor)
                                     .padding(.bottom, 3)
-                                Text("Move around the infinite canvas")
+                                Text("Move around the canvas")
                                     .multilineTextAlignment(.leading)
                                     .foregroundColor(.primary)
                         }

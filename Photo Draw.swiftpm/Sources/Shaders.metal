@@ -10,7 +10,6 @@ float luminance(float3 rgb) {
 kernel void correlation_filter(texture2d<float, access::read> inTexture [[texture(0)]],
                        texture2d<float, access:: write> outTexture [[texture(1)]],
                             constant float& size [[ buffer(0) ]],
-                            constant bool& invert [[ buffer(1) ]],
                        uint2 position [[thread_position_in_grid]]) {
     
     const auto textureSize = ushort2(outTexture.get_width(), outTexture.get_height());
@@ -34,9 +33,6 @@ kernel void correlation_filter(texture2d<float, access::read> inTexture [[textur
             // sample brightness
             const auto sample = inTexture.read(uint2(i,j));
             float sampleBrightness = luminance(sample.rgb);
-            if (invert) {
-                sampleBrightness = 1 - sampleBrightness;
-            }
             sampleSumBrightness += sampleBrightness;
             
             // Bivariate Gaussian Distribution:
@@ -62,9 +58,6 @@ kernel void correlation_filter(texture2d<float, access::read> inTexture [[textur
             // sample brightness
             const auto sample = inTexture.read(uint2(i,j));
             float sampleBrightness = luminance(sample.rgb);
-            if (invert) {
-                sampleBrightness = 1 - sampleBrightness;
-            }
             
             // Bivariate Gaussian Distribution:
             // e^(1/2 (-x^2/1^2 - y^2/σ^2))/(2π σ^2)
@@ -109,6 +102,7 @@ kernel void combine_confidence(texture2d<float, access::read> inTexture [[textur
     float confidenceOne = sampleOne.r;
     float confidenceTwo = sampleTwo.r;
     
+    // Output whichever prediction is more confident
     if (abs(confidenceOne) > abs(confidenceTwo)) {
         outTexture.write(sampleOne, position);
     } else {

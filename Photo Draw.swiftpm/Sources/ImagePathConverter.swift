@@ -17,6 +17,11 @@ fileprivate struct Point: Hashable {
 
 /// Converts an image to paths for vector drawing using the process outlined by the paper
 /// "A complete hand-drawn sketch vectorization framework" by L. Donati, S. Cesano, and A. Prati.
+/// Applies a kernel to the image to find the similarity of each pixel region with a 2D gaussian distribution. The distribution
+/// estimates how a pen stroke appears on the background. Next, convert the image to a binary representation
+/// signifying whether any pixel is part of a stroke. Then find the continuous strokes using depth first search on the white pixels.
+/// Find the border of these strokes and erode them while maintaining a continuous path.
+/// When the path is a center line, separate branching points in the path into separate strokes.
 class ImagePathConverter {
     struct Pixel {
         let x, y: Int
@@ -542,7 +547,6 @@ fileprivate final class PathDetectionKernel {
     private let imageTexture: MTLTexture
     private let outputTexture: MTLTexture
     private var size: Float = 2
-    private var invert: Bool
     private var commandQueue: MTLCommandQueue
     private let pipelineState: MTLComputePipelineState
     private let averageBrightness: Float
@@ -556,7 +560,6 @@ fileprivate final class PathDetectionKernel {
         var brightness: CGFloat = 0
         (cgImage.averageColor ?? .white).getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
         self.averageBrightness = Float(brightness)
-        self.invert = brightness < 0.5
         guard let commandQueue = library.device.makeCommandQueue() else {
             throw MetalErrors.commandQueueCreationFailed
         }
@@ -578,7 +581,6 @@ fileprivate final class PathDetectionKernel {
         encoder.setTexture(source, index: 0)
         encoder.setTexture(destination, index: 1)
         encoder.setBytes(&self.size, length: MemoryLayout<Float>.stride, index: 0)
-        encoder.setBytes(&self.invert, length: MemoryLayout<Bool>.stride, index: 1)
         
         let gridSize = MTLSize(width: source.width, height: source.height, depth: 1)
         let threadGroupWidth = self.pipelineState.threadExecutionWidth
@@ -945,9 +947,9 @@ fileprivate enum MetalErrors: Error {
 }
 
 
-/// Source: https://www.hackingwithswift.com/example-code/media/how-to-read-the-average-color-of-a-uiimage-using-ciareaaverage
-/// We can use this extension to get the average color for the current image and then get its brightness
-fileprivate extension CGImage {
+extension CGImage {
+    /// Source: https://www.hackingwithswift.com/example-code/media/how-to-read-the-average-color-of-a-uiimage-using-ciareaaverage
+    /// We can use this extension to get the average color for the current image and then get its brightness
     var averageColor: UIColor? {
         let inputImage = CIImage(cgImage: self)
         let extentVector = CIVector(x: inputImage.extent.origin.x, y: inputImage.extent.origin.y, z: inputImage.extent.size.width, w: inputImage.extent.size.height)

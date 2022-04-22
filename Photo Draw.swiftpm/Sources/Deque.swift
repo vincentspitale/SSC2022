@@ -51,7 +51,7 @@ fileprivate class ANode<T>: NodeProtocol {
     weak var next: U? = nil
     var prev: U? = nil
     
-    // By default removing a node does nothing
+    /// Return any data stored in this node
     func getData() -> T? {
         return nil
     }

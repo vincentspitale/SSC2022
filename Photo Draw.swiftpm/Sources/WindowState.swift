@@ -72,6 +72,8 @@ class WindowState: ObservableObject {
     @Published var isShowingPenColorPicker: Bool = false
     @Published var isShowingSelectionColorPicker: Bool = false
     @Published var photoMode: PhotoMode = .welcome
+    
+    @Published var finalizeImage: UIImage? = nil
     var imageConversion: ImageConversion? = nil
     // Notify when the image conversion has completed
     var imageCancellable: AnyCancellable? = nil
@@ -164,17 +166,17 @@ class WindowState: ObservableObject {
     }
     
     func startConversion(image: UIImage) async {
-            let centerScreen = await self.canvas?.getCenterScreenCanvasPosition() ?? CGPoint(x: 0, y: 0)
-            let conversion = ImageConversion(image: image, position: centerScreen)
-            // Begin background conversion
-            conversion.convert()
-            self.imageConversion = conversion
-            // Subscribe to this image conversion's updates
-            self.imageCancellable = conversion.objectWillChange.sink(receiveValue: { _ in
-                Task { @MainActor in
-                    self.objectWillChange.send()
-                }
-            })
+        let centerScreen = await self.canvas?.getCenterScreenCanvasPosition() ?? CGPoint(x: 0, y: 0)
+        let conversion = ImageConversion(image: image, position: centerScreen)
+        // Begin background conversion
+        conversion.convert()
+        self.imageConversion = conversion
+        // Subscribe to this image conversion's updates
+        self.imageCancellable = conversion.objectWillChange.sink(receiveValue: { _ in
+            Task { @MainActor in
+                self.objectWillChange.send()
+            }
+        })
         Task { @MainActor in
             withAnimation { self.currentTool = .placePhoto }
         }

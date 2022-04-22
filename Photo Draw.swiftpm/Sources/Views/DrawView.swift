@@ -12,6 +12,7 @@ struct DrawView: View {
     @ObservedObject var windowState: WindowState
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Environment(\.colorScheme) var colorScheme
+    @State var showingFinalizeView: Bool = false
     
     let colorColumns = [
         GridItem(.adaptive(minimum: 30))

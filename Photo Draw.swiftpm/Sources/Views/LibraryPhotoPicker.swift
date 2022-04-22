@@ -47,6 +47,7 @@ class LibraryPhotoPicker: UIViewController, PHPickerViewControllerDelegate {
     }
 
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        // dismiss picker
         self.state.photoMode = .none
         guard let result = results.first else { return }
         result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] photo, error in
