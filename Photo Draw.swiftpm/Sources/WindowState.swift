@@ -171,21 +171,21 @@ enum SemanticColor: CaseIterable, Comparable {
     private var _color: UIColor {
         switch self {
         case .primary:
-            return #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
+            return .label.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         case .gray:
-            return #colorLiteral(red: 0.4197611213, green: 0.4559625387, blue: 0.5046361685, alpha: 1)
+            return .systemGray.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         case .red:
-            return #colorLiteral(red: 0.7824426293, green: 0.03705377877, blue: 0.0794525817, alpha: 1)
+            return .systemRed.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         case .orange:
-            return #colorLiteral(red: 0.972686708, green: 0.4337486923, blue: 0, alpha: 1)
+            return .systemOrange.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         case .yellow:
-            return #colorLiteral(red: 0.7707784772, green: 0.5830464363, blue: 0, alpha: 1)
+            return .systemYellow.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         case .green:
-            return #colorLiteral(red: 0.1232964471, green: 0.6961600184, blue: 0.3467546701, alpha: 1)
+            return .systemGreen.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         case .blue:
-            return #colorLiteral(red: 0, green: 0.1903182566, blue: 0.419701159, alpha: 1)
+            return .systemBlue.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         case .purple:
-            return #colorLiteral(red: 0.4117100239, green: 0.2406530976, blue: 0.7068317533, alpha: 1)
+            return .systemPurple.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         }
     }
     
