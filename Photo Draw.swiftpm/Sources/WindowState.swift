@@ -28,7 +28,9 @@ class WindowState: ObservableObject {
             }
         }
     }
-    @Published var selection: Set<UUID>? = nil {
+    
+    // Store the indices of the selected strokes in the drawing's strokes array
+    @Published var selection: Set<Int>? = nil {
         // Selection changed, the selection color picker should not be visible
         willSet {
             DispatchQueue.main.async {
@@ -57,13 +59,13 @@ class WindowState: ObservableObject {
         isShowingPenColorPicker || isShowingSelectionColorPicker
     }
     
-    var selectedPaths: [PKStroke] {
+    var selectedStrokes: [PKStroke] {
         guard let selection = selection else { return [] }
         return []
     }
     
     var selectionColors: Set<UIColor> {
-        return self.selectedPaths.reduce(into: Set<UIColor>(), { colorSet, path in
+        return self.selectedStrokes.reduce(into: Set<UIColor>(), { colorSet, path in
             colorSet.insert(path.ink.color)
         })
     }
@@ -98,7 +100,7 @@ class WindowState: ObservableObject {
         withAnimation { self.selection = nil }
     }
     
-    func removePaths(_ removeSet: Set<UUID>) {
+    func removePaths(_ removeSet: Set<Int>) {
         
     }
     
@@ -157,29 +159,60 @@ enum SemanticColor: CaseIterable, Comparable {
     case blue
     case purple
     
-    public var color: UIColor {
+    private var _color: UIColor {
         switch self {
         case .primary:
-            return UIColor.label
+            return #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
         case .gray:
-            return UIColor.systemGray
+            return #colorLiteral(red: 0.4197611213, green: 0.4559625387, blue: 0.5046361685, alpha: 1)
         case .red:
-            return UIColor.systemRed
+            return #colorLiteral(red: 0.7824426293, green: 0.03705377877, blue: 0.0794525817, alpha: 1)
         case .orange:
-            return UIColor.systemOrange
+            return #colorLiteral(red: 0.972686708, green: 0.4337486923, blue: 0, alpha: 1)
         case .yellow:
-            return UIColor.systemYellow
+            return #colorLiteral(red: 0.7707784772, green: 0.5830464363, blue: 0, alpha: 1)
         case .green:
-            return UIColor.systemGreen
+            return #colorLiteral(red: 0.1315832138, green: 0.6066541672, blue: 0.2917357981, alpha: 1)
         case .blue:
-            return UIColor.systemBlue
+            return #colorLiteral(red: 0.1193856075, green: 0.3272579312, blue: 0.9138609767, alpha: 1)
         case .purple:
-            return UIColor.systemPurple
+            return #colorLiteral(red: 0.4117100239, green: 0.2406530976, blue: 0.7068317533, alpha: 1)
         }
     }
     
+    public var color: UIColor {
+        let lightMode = self._color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+    
+        lightMode.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        lightMode.getRed(&red, green: &green, blue: &blue, alpha: nil)
+        
+        let inverted = UIColor(red: 1 - red, green: 1 - green, blue: 1 - blue, alpha: alpha)
+        var invertedBrightness: CGFloat = 0
+        inverted.getHue(nil, saturation: nil, brightness: &invertedBrightness, alpha: nil)
+        
+        let darkMode = UIColor(hue: hue, saturation: saturation, brightness: invertedBrightness, alpha: alpha)
+        
+        let provider: (UITraitCollection) -> UIColor = { traits in
+            if traits.userInterfaceStyle == .dark {
+                return darkMode
+            } else {
+                return lightMode
+            }
+        }
+        return UIColor(dynamicProvider: provider)
+    }
+    
     public var pencilKitColor: UIColor {
-        self.color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        self._color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
     }
     
     // Accessibility label for color

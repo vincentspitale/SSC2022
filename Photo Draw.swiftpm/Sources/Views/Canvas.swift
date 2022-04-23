@@ -12,12 +12,27 @@ import UIKit
 import SwiftUI
 import PencilKit
 
-class Canvas: UIViewController, PKCanvasViewDelegate {
+class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegate {
     static var canvasSize: CGSize = CGSize(width: 10_000, height: 10_000)
     var state: WindowState
     
     var didScrollToOffset = false
     var cancellables = Set<AnyCancellable>()
+    
+    var selectionGestureRecognizer: UIPanGestureRecognizer?
+    var selectMinX: CGFloat?
+    var selectMaxX: CGFloat?
+    var selectMinY: CGFloat?
+    var selectMaxY: CGFloat?
+    
+    var selectRect: CGRect? {
+        guard let selectMinX = selectMinX,
+              let selectMaxX = selectMaxX,
+              let selectMinY = selectMinY,
+              let selectMaxY = selectMaxY else { return nil }
+        return CGRect(x: selectMinX, y: selectMinY,
+                      width: abs(selectMaxX - selectMinX), height: abs(selectMaxY - selectMinY))
+    }
     
     let canvasView: PKCanvasView = {
         let canvas = PKCanvasView()
@@ -29,6 +44,7 @@ class Canvas: UIViewController, PKCanvasViewDelegate {
         canvas.showsVerticalScrollIndicator = false
         canvas.showsHorizontalScrollIndicator = false
         canvas.contentSize = Canvas.canvasSize
+        canvas.drawingPolicy = UIPencilInteraction.prefersPencilOnlyDrawing ? .default : .anyInput
         return canvas
     }()
     
@@ -36,6 +52,7 @@ class Canvas: UIViewController, PKCanvasViewDelegate {
         self.state = state
         super.init(nibName: nil, bundle: nil)
         state.canvas = self
+        canvasView.delegate = self
         let changeToolCancellable = state.$currentTool.sink { [weak self] tool in
             guard let self = self else { return }
             switch tool {
@@ -111,6 +128,7 @@ class Canvas: UIViewController, PKCanvasViewDelegate {
     func handleTap(_ sender: UITapGestureRecognizer) -> Void {
         if sender.state == .ended {
             withAnimation{ self.state.isShowingPenColorPicker = false }
+            withAnimation{ self.state.selection = nil }
         }
     }
     
@@ -126,6 +144,15 @@ class Canvas: UIViewController, PKCanvasViewDelegate {
         //guard let transform = self.canvasView?.canvasTransform else { return CGPoint(x: 0, y: 0)}
         //return centerScreen.applying(transform.inverted())
         return CGPoint(x: 0, y: 0)
+    }
+    
+    
+    func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
+        if state.currentTool == .selection {
+            if let selectRect = self.selectRect {
+                
+            }
+        }
     }
 }
 
