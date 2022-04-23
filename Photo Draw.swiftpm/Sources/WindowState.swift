@@ -9,41 +9,9 @@ import Foundation
 import Combine
 import UIKit
 import SwiftUI
+import PencilKit
 
 class WindowState: ObservableObject {
-    // Strokes that are on the canvas
-    private var currentCanvas: CanvasState = CanvasState() {
-        willSet {
-            self.previousCanvas = currentCanvas
-        }
-    }
-    private var previousCanvas: CanvasState = CanvasState()
-    
-    var updatedCanvasRect: CGRect? {
-        var differingPaths = [PhotoDrawPath]()
-        let currentCanvas = self.currentCanvas
-        let previousCanvas = self.previousCanvas
-        for (key, path) in currentCanvas.paths {
-            let path2 = previousCanvas.paths[key]
-            if path != path2 {
-                differingPaths.append(path)
-            }
-        }
-        for (key, path) in previousCanvas.paths {
-            let path2 = currentCanvas.paths[key]
-            if path != path2 {
-                differingPaths.append(path)
-            }
-        }
-        return differingPaths.reduce(into: CGRect?.none, { box, path in
-            guard let lastBoundingBox = box else {
-                box = path.path.boundingBox.cgRect
-                return
-            }
-            box = lastBoundingBox.union(path.boundingBox())
-        })
-    }
-    
     // The color of the pen tool
     @Published var currentColor: SemanticColor = .primary
     @Published var currentTool: CanvasTool = .pen {
@@ -89,61 +57,35 @@ class WindowState: ObservableObject {
         isShowingPenColorPicker || isShowingSelectionColorPicker
     }
     
-    var selectedPaths: [PhotoDrawPath] {
+    var selectedPaths: [PKStroke] {
         guard let selection = selection else { return [] }
-        return selection.compactMap { id in
-            self.currentCanvas.paths[id]
-        }
+        return []
     }
     
-    var selectionColors: Set<SemanticColor> {
-        return self.selectedPaths.reduce(into: Set<SemanticColor>(), { colorSet, path in
-            colorSet.insert(path.color)
+    var selectionColors: Set<UIColor> {
+        return self.selectedPaths.reduce(into: Set<UIColor>(), { colorSet, path in
+            colorSet.insert(path.ink.color)
         })
     }
     
-    var paths: [PhotoDrawPath] {
-        self.currentCanvas.order.compactMap { id in
-            return self.currentCanvas.paths[id]
-        }
+    var paths: [PKStroke] {
+        []
     }
     
     enum SelectionModifyError: Error {
         case noSelection
     }
     
-    func updatePaths(paths: [PhotoDrawPath]) {
-        var newPaths = [PhotoDrawPath]()
-        var currentCanvas = currentCanvas
-        for path in paths {
-            if currentCanvas.paths[path.id] == nil {
-                newPaths.append(path)
-            }
-            currentCanvas.paths[path.id] = path
-        }
-        for newPath in newPaths {
-            currentCanvas.order.append(newPath.id)
-        }
-        self.currentCanvas = currentCanvas
+    func updatePaths(paths: [PKStroke]) {
+  
     }
     
-    func pathsForIdentifiers(_ ids: Set<UUID>) -> [PhotoDrawPath] {
-        return ids.compactMap { id in
-            return self.currentCanvas.paths[id]
-        }
+    func pathsForIdentifiers(_ ids: Set<UUID>) -> [PKStroke] {
+        return []
     }
     
     func recolorSelection(newColor: SemanticColor) throws -> Void {
-        guard selection != nil else {
-            throw SelectionModifyError.noSelection
-        }
-        let updatedPaths = selectedPaths.map { path -> PhotoDrawPath in
-            var path = path
-            path.color = newColor
-            return path
-        }
-        self.updatePaths(paths: updatedPaths)
-        
+    
         // Update the canvas with the new color
         objectWillChange.send()
     }
@@ -157,12 +99,7 @@ class WindowState: ObservableObject {
     }
     
     func removePaths(_ removeSet: Set<UUID>) {
-        var currentCanvas = self.currentCanvas
-        for id in removeSet {
-            currentCanvas.paths.removeValue(forKey: id)
-        }
-        currentCanvas.order = self.currentCanvas.order.filter { !removeSet.contains($0)}
-        self.currentCanvas = currentCanvas
+        
     }
     
     func startConversion(image: UIImage) async {
@@ -209,75 +146,6 @@ enum PhotoMode {
     case example
 }
 
-
-struct PhotoDrawPath: Identifiable {
-    var id: UUID
-    var path: Path
-    var color: SemanticColor
-    var transform: CGAffineTransform
-    
-    init(path: Path, color: UIColor) {
-        self.id = UUID()
-        self.path = path
-        self.color = SemanticColor.colorToSemanticColor(color: color)
-        self.transform = .identity
-    }
-    
-    init(path: Path, semanticColor: SemanticColor) {
-        self.id = UUID()
-        self.path = path
-        self.color = semanticColor
-        self.transform = .identity
-    }
-    
-    
-    mutating func transform(_ newTransform: CGAffineTransform, commitTransform: Bool) {
-        self.transform = newTransform
-        if commitTransform {
-            self.path = self.path.copy(using: newTransform)
-            self.transform = .identity
-        }
-    }
-    
-    // Allow the path to be modified with a new path to fit to the new point data
-    mutating func updatePath(newPath: Path) {
-        self.path = newPath
-    }
-    
-    func boundingBox() -> CGRect {
-        self.path.boundingBox.cgRect.applying(self.transform)
-    }
-    
-}
-
-extension PhotoDrawPath: Equatable, Hashable {
-    static func == (lhs: PhotoDrawPath, rhs: PhotoDrawPath) -> Bool {
-        lhs.path == rhs.path &&
-        lhs.color == rhs.color &&
-        lhs.transform == rhs.transform
-    }
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(path)
-        hasher.combine(color)
-    }
-}
-
-struct CanvasState {
-    var paths: [UUID : PhotoDrawPath] = [:]
-    var order: [UUID] = []
-}
-
-extension CanvasState: Equatable, Hashable {
-    static func == (lhs: CanvasState, rhs: CanvasState) -> Bool {
-        lhs.paths == rhs.paths &&
-        lhs.order == rhs.order
-    }
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(paths)
-        hasher.combine(order)
-    }
-}
-
 enum SemanticColor: CaseIterable, Comparable {
     // Supported colors
     case primary
@@ -308,6 +176,10 @@ enum SemanticColor: CaseIterable, Comparable {
         case .purple:
             return UIColor.systemPurple
         }
+    }
+    
+    public var pencilKitColor: UIColor {
+        self.color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
     }
     
     // Accessibility label for color
@@ -395,7 +267,7 @@ enum SemanticColor: CaseIterable, Comparable {
 
 class ImageConversion: ObservableObject {
     let image: UIImage
-    @Published var paths: [PhotoDrawPath]? = nil
+    @Published var paths: [PKStroke]? = nil
     
     lazy var scaleTransform: CGAffineTransform = {
         // Initially fit the image within a 400 point square
@@ -441,16 +313,16 @@ class ImageConversion: ObservableObject {
     func convert() {
         Task {
             let convertedPaths = ImagePathConverter(image: image).findPaths()
-            self.paths = convertedPaths.map { (path, color) -> PhotoDrawPath in
-                return PhotoDrawPath(path: path, color: color)
+            self.paths = convertedPaths.map { (path, color) -> PKStroke in
+                return PKStroke(ink: .init(.pen, color: color), path: path)
             }
         }
     }
     
-    func getPaths() -> [PhotoDrawPath] {
+    func getPaths() -> [PKStroke] {
         guard let paths = self.paths else { return [] }
         return paths.map { path in
-            PhotoDrawPath(path: path.path.copy(using: transform), semanticColor: path.color)
+            return PKStroke(ink: path.ink, path: path.path, transform: transform, mask: nil)
         }
     }
 }

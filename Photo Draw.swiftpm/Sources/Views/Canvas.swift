@@ -10,15 +10,64 @@ import Combine
 import Foundation
 import UIKit
 import SwiftUI
+import PencilKit
 
-class Canvas: UIViewController {
+class Canvas: UIViewController, PKCanvasViewDelegate {
+    static var canvasSize: CGSize = CGSize(width: 10_000, height: 10_000)
     var state: WindowState
-    var renderView: RenderView? = nil
+    
+    var didScrollToOffset = false
+    var cancellables = Set<AnyCancellable>()
+    
+    let canvasView: PKCanvasView = {
+        let canvas = PKCanvasView()
+        canvas.translatesAutoresizingMaskIntoConstraints = false
+        canvas.backgroundColor = .systemGray6
+        canvas.minimumZoomScale = 1
+        canvas.maximumZoomScale = 1
+        canvas.zoomScale = 1
+        canvas.showsVerticalScrollIndicator = false
+        canvas.showsHorizontalScrollIndicator = false
+        canvas.contentSize = Canvas.canvasSize
+        return canvas
+    }()
     
     init(state: WindowState) {
         self.state = state
         super.init(nibName: nil, bundle: nil)
         state.canvas = self
+        let changeToolCancellable = state.$currentTool.sink { [weak self] tool in
+            guard let self = self else { return }
+            switch tool {
+            case .pen:
+                self.canvasView.drawingGestureRecognizer.isEnabled = true
+                self.canvasView.tool = PKInkingTool(.pen, color: state.currentColor.pencilKitColor)
+            case .placePhoto:
+                self.canvasView.drawingGestureRecognizer.isEnabled = false
+                self.canvasView.tool = PKInkingTool(.pen, color: state.currentColor.pencilKitColor)
+            case .remove:
+                self.canvasView.drawingGestureRecognizer.isEnabled = true
+                self.canvasView.tool = PKEraserTool(.vector)
+            case .selection:
+                self.canvasView.drawingGestureRecognizer.isEnabled = true
+                self.canvasView.tool = PKLassoTool()
+            case .touch:
+                self.canvasView.tool = PKInkingTool(.pen, color: state.currentColor.pencilKitColor)
+                self.canvasView.drawingGestureRecognizer.isEnabled = false
+            }
+        }
+        cancellables.insert(changeToolCancellable)
+        
+        let colorCancellable = state.$currentColor.sink { [weak self] color in
+            guard let self = self else { return }
+            if state.currentTool == .pen {
+                self.canvasView.drawingGestureRecognizer.isEnabled = true
+                self.canvasView.tool = PKInkingTool(.pen, color: color.pencilKitColor)
+            }
+        }
+        
+        cancellables.insert(colorCancellable)
+        
     }
     
     @available(*, unavailable)
@@ -29,27 +78,39 @@ class Canvas: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.handleTap(_:)))
-        let renderView = RenderView(state: state, frame: self.view.frame)
-        renderView.translatesAutoresizingMaskIntoConstraints = false
-        renderView.addGestureRecognizer(tapGesture)
-        self.view.addSubview(renderView)
+        
+        self.view.addSubview(canvasView)
         
         let constraints = [
-            renderView.topAnchor.constraint(equalTo: self.view.topAnchor),
-            renderView.heightAnchor.constraint(greaterThanOrEqualTo: self.view.heightAnchor),
-            renderView.widthAnchor.constraint(greaterThanOrEqualTo: self.view.widthAnchor),
-            renderView.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
-            renderView.widthAnchor.constraint(equalTo: renderView.heightAnchor),
+            canvasView.topAnchor.constraint(equalTo: self.view.topAnchor),
+            canvasView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            canvasView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            canvasView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
         ]
         NSLayoutConstraint.activate(constraints)
-        self.renderView = renderView
+        
+        
+        canvasView.addGestureRecognizer(tapGesture)
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        self.scrollToInitialOffsetIfRequired()
+    }
+    
+    private func scrollToInitialOffsetIfRequired() {
+        if !didScrollToOffset {
+            let offsetX = (canvasView.contentSize.width - canvasView.frame.width) / 2
+            let offsetY = (canvasView.contentSize.height - canvasView.frame.height) / 2
+            self.canvasView.contentOffset = CGPoint(x: offsetX, y: offsetY)
+            didScrollToOffset = true
+        }
     }
     
     @objc
     func handleTap(_ sender: UITapGestureRecognizer) -> Void {
         if sender.state == .ended {
             withAnimation{ self.state.isShowingPenColorPicker = false }
-            withAnimation{ state.selection = nil }
         }
     }
     
@@ -59,14 +120,16 @@ class Canvas: UIViewController {
             return self.view.bounds
         }
         let canvas = await MainActor.run { () -> CGRect in
-            return self.renderView?.bounds ?? CGRect.zero
+            return self.canvasView.bounds ?? CGRect.zero
         }
         let centerScreen = CGPoint(x: canvas.width / 2, y: screen.height / 2)
-        guard let transform = self.renderView?.canvasTransform else { return CGPoint(x: 0, y: 0)}
-        return centerScreen.applying(transform.inverted())
+        //guard let transform = self.canvasView?.canvasTransform else { return CGPoint(x: 0, y: 0)}
+        //return centerScreen.applying(transform.inverted())
+        return CGPoint(x: 0, y: 0)
     }
 }
 
+/*
 class RenderView: UIView, UIGestureRecognizerDelegate {
     private var state: WindowState
     
@@ -617,6 +680,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
     }
     
 }
+ */
 
 class AppColors {
     static var accent: UIColor = {
@@ -643,14 +707,5 @@ struct CanvasView: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
         
-    }
-}
-
-
-fileprivate extension Path {
-    // Determine if this path should be selected by a remove area
-    func intersectsOrContainedBy(rect: CGRect) -> Bool {
-        let rectPath = Path(cgPath: CGPath(rect: rect, transform: nil))
-        return self.intersects(rectPath) || rectPath.contains(self)
     }
 }

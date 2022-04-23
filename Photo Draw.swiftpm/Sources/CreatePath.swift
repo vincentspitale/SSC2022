@@ -5,25 +5,18 @@
 //  Created by Vincent Spitale on 4/10/22.
 //
 
-import CoreGraphics
 import Foundation
+import CoreGraphics
+import PencilKit
 
 class CreatePath {
-    // Fits the point data to a path of line segments for simplicity
-    static func pathFromPoints(_ points: [CGPoint]) -> Path {
-        var windows = [(p0: CGPoint, p1: CGPoint)]()
-        _ = points.reduce(into: CGPoint?.none, { last, point in
-            if let last = last, point != last {
-                windows.append((p0: last, p1: point))
-            }
-            last = point
-        })
-        let components = windows.compactMap { (p0, p1) -> LineSegment? in
-            return LineSegment(p0: p0, p1: p1)
-        }.map {
-            PathComponent(curve: $0)
+    // Fits the point data to a cubic b-spline path
+    static func pathFromPoints(_ points: [CGPoint]) -> PKStrokePath {
+        // TODO
+        let controlPoints = points.map { point in
+            PKStrokePoint(location: point, timeOffset: 0, size: CGSize(width: 3, height: 3), opacity: 1, force: 2, azimuth: 0, altitude: 0)
         }
-        return Path(components: components)
+        return PKStrokePath(controlPoints: controlPoints, creationDate: Date())
     }
 }
 

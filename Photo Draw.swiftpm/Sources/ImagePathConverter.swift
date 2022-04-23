@@ -10,6 +10,7 @@ import UIKit
 import MetalKit
 import SwiftUI
 import simd
+import PencilKit
 
 fileprivate struct Point: Hashable {
     let x,y: Int
@@ -51,10 +52,10 @@ class ImagePathConverter {
     }
     
     /// Converts the provided image to paths with each path's average color
-    public func findPaths() -> [(Path, UIColor)] {
+    public func findPaths() -> [(PKStrokePath, UIColor)] {
         let centerLinePaths = self.findCenterLinePaths()
         // Paths converted to bezier curves by least squares
-        var pathColors = [[(Path, UIColor)]](repeating: [], count: centerLinePaths.count)
+        var pathColors = [[(PKStrokePath, UIColor)]](repeating: [], count: centerLinePaths.count)
         
         DispatchQueue.concurrentPerform(iterations: centerLinePaths.count) { index in
             let path = centerLinePaths[index]

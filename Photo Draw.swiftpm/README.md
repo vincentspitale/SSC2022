@@ -10,8 +10,6 @@ My app for the 2022 Swift Student Challenge.
 
 ### Disclaimers
 
-The app uses the open source library 'BezierKit' by Holmes Futrell to represent vector paths. This code allows the app to detect intersections between paths which is used for selection and deletion. Paths that are created in 'BezierKit' can easily be coverted to CGPaths to be rendered using Core Graphics.
-
 The image path finding algorithm I implemented uses the process outlined in the paper [A complete hand-drawn sketch vectorization framework](https://arxiv.org/pdf/1802.05902.pdf) by L. Donati, S. Cesano, and A. Prati.
 
 **This app was tested with Xcode 13.3 and should be compiled using Xcode rather than Swift Playgrounds 4.**
