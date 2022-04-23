@@ -53,26 +53,26 @@ class ExamplePhotosController: UIViewController {
 
 struct ExamplePhotosNavigationView: View {
     @ObservedObject var windowState: WindowState
-    let photoColumns = [GridItem](repeating: GridItem(.flexible()), count: 3)
+    let photoColumns = [GridItem](repeating: GridItem(.flexible(), spacing: 1), count: 3)
     
     var body: some View {
         NavigationView {
             VStack {
-            LazyVGrid(columns: photoColumns, spacing: 0.5) {
-                ForEach(ExamplePhotos.photos, id: \.self) { image in
-                    Button(action: { self.convert(image: image) } ) {
-                        Rectangle()
-                            .aspectRatio(1, contentMode: .fit)
-                            .overlay(
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                            )
-                            .clipShape(Rectangle())
+                LazyVGrid(columns: photoColumns, spacing: 1) {
+                    ForEach(ExamplePhotos.photos, id: \.self) { image in
+                        Button(action: { self.convert(image: image) } ) {
+                            Rectangle()
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay(
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                )
+                                .clipShape(Rectangle())
+                        }
                     }
                 }
-            }
-            Spacer()
+                Spacer()
             }
             .navigationTitle("Example Photos")
             .navigationBarTitleDisplayMode(.inline)
@@ -102,6 +102,7 @@ class ExamplePhotos {
     static var photos: [UIImage] = {
         [ UIImage(named: "example1.heic"),
           UIImage(named: "example2.jpg"),
-          UIImage(named: "example3.jpg")].compactMap { $0 }
+          UIImage(named: "example3.jpg"),
+          UIImage(named: "example4.jpg")].compactMap { $0 }
     }()
 }

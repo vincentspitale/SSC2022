@@ -106,6 +106,8 @@ struct DrawView: View {
                         } else {
                             Text("Finding paths")
                                 .foregroundColor(.accentColor)
+                                .font(.headline)
+                                .bold()
                                 .padding()
                                 .background(
                                     Rectangle().fill(Color(uiColor: UIColor.systemGray6))
@@ -288,7 +290,6 @@ struct DrawView: View {
                 Image(systemName: "line.diagonal")
                     .font(.largeTitle)
                     .foregroundColor(Color.red)
-                
             }
             .frame(width: 50)
         }
