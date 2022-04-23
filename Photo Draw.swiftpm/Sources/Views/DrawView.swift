@@ -19,8 +19,8 @@ struct DrawView: View {
     ]
     
     // Get the first three colors that are in the selection
-    var selectionColorIndices: [(index: Int, color: SemanticColor)] {
-        let colors = Array(windowState.selectionColors).sorted().enumerated().filter { index, color in
+    var selectionColorIndices: [(index: Int, color: UIColor)] {
+        let colors = Array(windowState.selectionColors).enumerated().filter { index, color in
             index < 3
         }.map { $0.1 }
         return Array(zip(colors.indices, colors))
@@ -268,7 +268,7 @@ struct DrawView: View {
                 // Display the colors of the paths that are selected
                 ForEach(selectionColorIndices, id: \.index) { index, color in
                     Circle()
-                        .foregroundColor(Color(uiColor: color.color))
+                        .foregroundColor(Color(uiColor: color))
                         .frame(height: 30)
                         .overlay{
                             Circle()
@@ -297,7 +297,7 @@ struct DrawView: View {
     }
     
     private func selectionIsColor(_ color: SemanticColor) -> Bool {
-        windowState.selectionColors.count == 1 && windowState.selectionColors.contains(color)
+        windowState.selectionColors.count == 1 && windowState.pencilSelectionColors.contains(color.pencilKitColor)
     }
     
     private func penAction() -> Void {

@@ -10,6 +10,7 @@ import UIKit
 import MetalKit
 import SwiftUI
 import simd
+import PencilKit
 
 fileprivate struct Point: Hashable {
     let x,y: Int
@@ -51,16 +52,22 @@ class ImagePathConverter {
     }
     
     /// Converts the provided image to paths with each path's average color
-    public func findPaths() -> [(Path, UIColor)] {
+    public func findPaths() -> [([CGPoint], UIColor)] {
+        var brightness: CGFloat = 0
+        (self.image.cgImage?.averageColor ?? .white).getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
+        let averageBrightness = Float(brightness)
         let centerLinePaths = self.findCenterLinePaths()
         // Paths converted to bezier curves by least squares
-        var pathColors = [[(Path, UIColor)]](repeating: [], count: centerLinePaths.count)
+        var pathColors = [[([CGPoint], UIColor)]](repeating: [], count: centerLinePaths.count)
         
         DispatchQueue.concurrentPerform(iterations: centerLinePaths.count) { index in
             let path = centerLinePaths[index]
             let color: UIColor = averageColor(path: path)
+            
+            // For simplicity use the point data as cubic b-spline control points
             let pointData = path.map { CGPoint(x:CGFloat($0.x), y: CGFloat($0.y))}
-            pathColors[index] = [(CreatePath.pathFromPoints(pointData), color)]
+            let newColor = averageBrightness > 0.5 ? color : SemanticColor.invertedBrightnessColor(color: color)
+            pathColors[index] = [(pointData, newColor)]
         }
         
         return pathColors.flatMap { $0 }
@@ -436,7 +443,7 @@ fileprivate class Connectivity {
         let col2 = [topRight, right, bottomRight].map { group.contains($0) }.map { $0 ? Int(1) : Int(0)}
         let columns = [col0, col1, col2]
         
-        // Closure compares a given matrix to the 3x3 grid of pixels surrounding a point
+        // Compares a given matrix to the 3x3 grid of pixels surrounding a point
         let isRequired: (simd_float3x3) -> Bool = { matrix in
             let (hitCol0, hitCol1, hitCol2) = matrix.columns
             let hitColumns = [hitCol0, hitCol1, hitCol2]

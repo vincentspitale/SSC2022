@@ -6,11 +6,11 @@ My app for the 2022 Swift Student Challenge.
 
 ## Why did I make this app?
 
+There's something to be said for writing on pen and paper. You can't get distracted by a slack notification in a notebook like you can when writing on an iPad. However, the experience of writing and drawing digitally can be better at times. With digital ink, if you want to move something to make more space, you can simply select and move it. And if you want to change the color, you can pick a new one. 
 
+For years I wished there was a way to convert my notes on paper to digital. Better yet if I could easily take a photo of the chalkboard in class and have all of the math written there editable and in my notes. So I decided to make an app that can do just that!
 
 ### Disclaimers
-
-The app uses the open source library 'BezierKit' by Holmes Futrell to represent vector paths. This code allows the app to detect intersections between paths which is used for selection and deletion. Paths that are created in 'BezierKit' can easily be coverted to CGPaths to be rendered using Core Graphics.
 
 The image path finding algorithm I implemented uses the process outlined in the paper [A complete hand-drawn sketch vectorization framework](https://arxiv.org/pdf/1802.05902.pdf) by L. Donati, S. Cesano, and A. Prati.
 
