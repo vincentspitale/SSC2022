@@ -10,6 +10,7 @@ import Combine
 import VisionKit
 import SwiftUI
 
+/// Enables importing an image from the system document scanner
 struct CameraScanView: UIViewControllerRepresentable {
     typealias UIViewControllerType = CameraScan
     @ObservedObject var windowState: WindowState

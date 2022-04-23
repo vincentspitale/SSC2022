@@ -69,7 +69,7 @@ class WindowState: ObservableObject {
     var selectionColors: Set<UIColor> {
         var colors = Set<UIColor>()
         return self.selectedStrokes.reduce(into: Set<UIColor>(), { colorSet, path in
-            let dynamicColor = SemanticColor.invertedBrightness(color: path.1.ink.color)
+            let dynamicColor = SemanticColor.adaptiveInvertedBrightness(color: path.1.ink.color)
             guard !colors.contains(path.1.ink.color) else {
                 return
             }
@@ -78,6 +78,7 @@ class WindowState: ObservableObject {
         })
     }
     
+    // Colors that are equatable
     var pencilSelectionColors: Set<UIColor> {
         Set<UIColor>(selectionColors.map { $0.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))})
     }
@@ -146,7 +147,6 @@ enum CanvasTool: Equatable {
     case placePhoto
 }
 
-
 enum PhotoMode {
     case welcome
     case none
@@ -155,6 +155,7 @@ enum PhotoMode {
     case example
 }
 
+/// Colors that a user can select
 enum SemanticColor: CaseIterable, Comparable {
     // Supported colors
     case primary
@@ -180,7 +181,7 @@ enum SemanticColor: CaseIterable, Comparable {
         case .yellow:
             return #colorLiteral(red: 0.7707784772, green: 0.5830464363, blue: 0, alpha: 1)
         case .green:
-            return #colorLiteral(red: 0.1315832138, green: 0.6066541672, blue: 0.2917357981, alpha: 1)
+            return #colorLiteral(red: 0.1232964471, green: 0.6961600184, blue: 0.3467546701, alpha: 1)
         case .blue:
             return #colorLiteral(red: 0.1193856075, green: 0.3272579312, blue: 0.9138609767, alpha: 1)
         case .purple:
@@ -189,10 +190,26 @@ enum SemanticColor: CaseIterable, Comparable {
     }
     
     public var color: UIColor {
-        Self.invertedBrightness(color: _color)
+        Self.adaptiveInvertedBrightness(color: _color)
     }
     
-    static func invertedBrightness(color: UIColor) -> UIColor {
+    /// Color that changes depending on the system theme with an inverted brightness variant of the given color
+    static func adaptiveInvertedBrightness(color: UIColor) -> UIColor {
+        let lightMode = color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        let darkMode = Self.invertedBrightnessColor(color: lightMode)
+        
+        let provider: (UITraitCollection) -> UIColor = { traits in
+            if traits.userInterfaceStyle == .dark {
+                return darkMode
+            } else {
+                return lightMode
+            }
+        }
+        return UIColor(dynamicProvider: provider)
+    }
+    
+    /// Inverted brightness variant of the given color
+    static func invertedBrightnessColor(color: UIColor) -> UIColor {
         let lightMode = color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         
         var hue: CGFloat = 0
@@ -211,23 +228,15 @@ enum SemanticColor: CaseIterable, Comparable {
         var invertedBrightness: CGFloat = 0
         inverted.getHue(nil, saturation: nil, brightness: &invertedBrightness, alpha: nil)
         
-        let darkMode = UIColor(hue: hue, saturation: saturation, brightness: invertedBrightness, alpha: alpha)
-        
-        let provider: (UITraitCollection) -> UIColor = { traits in
-            if traits.userInterfaceStyle == .dark {
-                return darkMode
-            } else {
-                return lightMode
-            }
-        }
-        return UIColor(dynamicProvider: provider)
+        return UIColor(hue: hue, saturation: saturation, brightness: invertedBrightness, alpha: alpha)
     }
     
+    /// The light mode color that PencilKit uses to interpret light and dark mode colors
     public var pencilKitColor: UIColor {
         self._color
     }
     
-    // Accessibility label for color
+    /// Accessibility label for color
     public func name(isDark: Bool) -> String {
         switch self {
         case .primary:
@@ -249,67 +258,9 @@ enum SemanticColor: CaseIterable, Comparable {
         }
     }
     
-    /// Find the closest color that adapts to light and dark mode for the given color
-    public static func colorToSemanticColor(color: UIColor) -> SemanticColor {
-        var hue: CGFloat = 0.0
-        var saturation: CGFloat = 0.0
-        var brightness: CGFloat = 0.0
-        
-        
-        var r: CGFloat = 0.0
-        var g: CGFloat = 0.0
-        var b: CGFloat = 0.0
-        
-        color.getRed(&r, green: &g, blue: &b, alpha: nil)
-        
-        color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
-        
-        // Using colors that are independent of the system theme, light or dark mode
-        let red = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)
-        let green = #colorLiteral(red: 0, green: 1, blue: 0, alpha: 1)
-        let blue = #colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)
-        // Have only a few color match options to prevent incorrect conversions
-        let supportedColors: [(SemanticColor, UIColor)] = [(SemanticColor.red, red), (SemanticColor.green, green), (SemanticColor.blue, blue)]
-        let closestColor: (SemanticColor, CGFloat)? = supportedColors.reduce(into: nil, { nearestColor, color in
-            var colorR: CGFloat = 0.0
-            var colorG: CGFloat = 0.0
-            var colorB: CGFloat = 0.0
-            
-            color.1.getRed(&colorR, green: &colorG, blue: &colorB, alpha: nil)
-            let crossProduct = r * colorR + g * colorG + b * colorB
-            
-            if let (semanticColor, similarity) = nearestColor {
-                if crossProduct > similarity  {
-                    nearestColor = (semanticColor, crossProduct)
-                }
-            } else {
-                nearestColor = (color.0, crossProduct)
-            }
-        })
-        
-        if let closestColor = closestColor {
-            let color = closestColor.0.color
-            var colorR: CGFloat = 0.0
-            var colorG: CGFloat = 0.0
-            var colorB: CGFloat = 0.0
-            
-            color.getRed(&colorR, green: &colorG, blue: &colorB, alpha: nil)
-            if max(abs(colorR - r), abs(colorG - g), abs(colorB - b)) < 0.3 {
-                return closestColor.0
-            }
-        }
-        return .primary
-        
-    }
-    
-    private static func colorHue(color: UIColor) -> CGFloat {
-        var hue: CGFloat = 0.0
-        color.getHue(&hue, saturation: nil, brightness: nil, alpha: nil)
-        return hue
-    }
-    
 }
 
+/// Photo that is being converted to a collection of paths
 class ImageConversion: ObservableObject {
     let image: UIImage
     @Published var paths: [([CGPoint], UIColor)]? = nil

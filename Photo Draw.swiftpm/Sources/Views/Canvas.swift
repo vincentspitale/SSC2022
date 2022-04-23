@@ -177,8 +177,6 @@ class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegat
         default:
             break
         }
-        
-        
     }
     
     private func updateSelectRect(_ translatedPoint: CGPoint) {
@@ -313,7 +311,6 @@ class ImageRenderView: UIView, UIGestureRecognizerDelegate {
         self.pinchGesture = pinch
         self.addGestureRecognizer(pinch)
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-        pan.minimumNumberOfTouches = 2
         pan.delegate = self
         self.panGesture = pan
         self.addGestureRecognizer(pan)
@@ -396,7 +393,7 @@ class ImageRenderView: UIView, UIGestureRecognizerDelegate {
         }
         self.setNeedsDisplay()
     }
-        
+    
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         true
     }

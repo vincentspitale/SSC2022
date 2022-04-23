@@ -10,6 +10,7 @@ import Combine
 import SwiftUI
 import UIKit
 
+/// Allows the user to add an image from one of the provided examples
 struct ExamplePhotosView: UIViewControllerRepresentable {
     typealias UIViewControllerType = ExamplePhotosController
     var windowState: WindowState
