@@ -59,35 +59,42 @@ class WindowState: ObservableObject {
         isShowingPenColorPicker || isShowingSelectionColorPicker
     }
     
-    var selectedStrokes: [PKStroke] {
+    var selectedStrokes: [(Int, PKStroke)] {
         guard let selection = selection else { return [] }
-        return []
+        return canvas?.strokes.enumerated().filter({ index, stroke in
+            return selection.contains(index)
+        }) ?? []
     }
     
     var selectionColors: Set<UIColor> {
+        var colors = Set<UIColor>()
         return self.selectedStrokes.reduce(into: Set<UIColor>(), { colorSet, path in
-            colorSet.insert(path.ink.color)
+            let dynamicColor = SemanticColor.invertedBrightness(color: path.1.ink.color)
+            guard !colors.contains(path.1.ink.color) else {
+                return
+            }
+            colors.insert(path.1.ink.color)
+            colorSet.insert(dynamicColor)
         })
     }
     
-    var paths: [PKStroke] {
-        []
+    var pencilSelectionColors: Set<UIColor> {
+        Set<UIColor>(selectionColors.map { $0.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))})
     }
     
     enum SelectionModifyError: Error {
         case noSelection
     }
     
-    func updatePaths(paths: [PKStroke]) {
-  
-    }
-    
-    func pathsForIdentifiers(_ ids: Set<UUID>) -> [PKStroke] {
-        return []
+    func addStrokes(strokes: [PKStroke]) {
+        canvas?.addStrokes(strokes)
     }
     
     func recolorSelection(newColor: SemanticColor) throws -> Void {
-    
+        let recoloredStrokes = selectedStrokes.map { index, stroke in
+            return (index, PKStroke(ink: PKInk(.pen, color: newColor.pencilKitColor), path: stroke.path, transform: stroke.transform, mask: stroke.mask))
+        }
+        self.canvas?.updateStrokes(recoloredStrokes)
         // Update the canvas with the new color
         objectWillChange.send()
     }
@@ -101,7 +108,7 @@ class WindowState: ObservableObject {
     }
     
     func removePaths(_ removeSet: Set<Int>) {
-        
+        self.canvas?.removeStrokes(removeSet)
     }
     
     func startConversion(image: UIImage) async {
@@ -125,7 +132,7 @@ class WindowState: ObservableObject {
     func placeImage() {
         guard let imageConversion = imageConversion else { return }
         let imagePaths = imageConversion.getPaths()
-        self.updatePaths(paths: imagePaths)
+        self.addStrokes(strokes: imagePaths)
         withAnimation { self.currentTool = .pen }
         self.imageConversion = nil
     }
@@ -159,6 +166,7 @@ enum SemanticColor: CaseIterable, Comparable {
     case blue
     case purple
     
+    // light mode colors
     private var _color: UIColor {
         switch self {
         case .primary:
@@ -181,7 +189,11 @@ enum SemanticColor: CaseIterable, Comparable {
     }
     
     public var color: UIColor {
-        let lightMode = self._color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        Self.invertedBrightness(color: _color)
+    }
+    
+    static func invertedBrightness(color: UIColor) -> UIColor {
+        let lightMode = color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
         
         var hue: CGFloat = 0
         var saturation: CGFloat = 0
@@ -212,7 +224,7 @@ enum SemanticColor: CaseIterable, Comparable {
     }
     
     public var pencilKitColor: UIColor {
-        self._color.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        self._color
     }
     
     // Accessibility label for color
@@ -300,7 +312,7 @@ enum SemanticColor: CaseIterable, Comparable {
 
 class ImageConversion: ObservableObject {
     let image: UIImage
-    @Published var paths: [PKStroke]? = nil
+    @Published var paths: [([CGPoint], UIColor)]? = nil
     
     lazy var scaleTransform: CGAffineTransform = {
         // Initially fit the image within a 400 point square
@@ -346,16 +358,19 @@ class ImageConversion: ObservableObject {
     func convert() {
         Task {
             let convertedPaths = ImagePathConverter(image: image).findPaths()
-            self.paths = convertedPaths.map { (path, color) -> PKStroke in
-                return PKStroke(ink: .init(.pen, color: color), path: path)
-            }
+            self.paths = convertedPaths.map { $0 }
         }
     }
     
     func getPaths() -> [PKStroke] {
         guard let paths = self.paths else { return [] }
-        return paths.map { path in
-            return PKStroke(ink: path.ink, path: path.path, transform: transform, mask: nil)
+        return paths.map { points, color in
+            let transformedPoints = points.map { point -> PKStrokePoint in
+                let transformed = point.applying(transform)
+                return PKStrokePoint(location: transformed, timeOffset: 0, size: CGSize(width: 3, height: 3), opacity: 1, force: 2, azimuth: 0, altitude: 0)
+            }
+            let path = PKStrokePath(controlPoints: transformedPoints, creationDate: Date())
+            return PKStroke(ink: PKInk(.pen, color: color), path: path, transform: .identity, mask: nil)
         }
     }
 }

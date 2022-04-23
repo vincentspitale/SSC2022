@@ -297,7 +297,7 @@ struct DrawView: View {
     }
     
     private func selectionIsColor(_ color: SemanticColor) -> Bool {
-        windowState.selectionColors.count == 1 && windowState.selectionColors.contains(color.color)
+        windowState.selectionColors.count == 1 && windowState.pencilSelectionColors.contains(color.pencilKitColor)
     }
     
     private func penAction() -> Void {

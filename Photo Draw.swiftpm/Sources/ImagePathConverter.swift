@@ -52,16 +52,17 @@ class ImagePathConverter {
     }
     
     /// Converts the provided image to paths with each path's average color
-    public func findPaths() -> [(PKStrokePath, UIColor)] {
+    public func findPaths() -> [([CGPoint], UIColor)] {
         let centerLinePaths = self.findCenterLinePaths()
         // Paths converted to bezier curves by least squares
-        var pathColors = [[(PKStrokePath, UIColor)]](repeating: [], count: centerLinePaths.count)
+        var pathColors = [[([CGPoint], UIColor)]](repeating: [], count: centerLinePaths.count)
         
         DispatchQueue.concurrentPerform(iterations: centerLinePaths.count) { index in
             let path = centerLinePaths[index]
             let color: UIColor = averageColor(path: path)
             let pointData = path.map { CGPoint(x:CGFloat($0.x), y: CGFloat($0.y))}
-            pathColors[index] = [(CreatePath.pathFromPoints(pointData), color)]
+            // For simplicity use the point data as cubic b-spline control points
+            pathColors[index] = [(pointData, SemanticColor.colorToSemanticColor(color: color).pencilKitColor)]
         }
         
         return pathColors.flatMap { $0 }

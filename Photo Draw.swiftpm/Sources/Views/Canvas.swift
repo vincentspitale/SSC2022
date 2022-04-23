@@ -13,12 +13,14 @@ import SwiftUI
 import PencilKit
 
 class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegate {
+    // Make a really large canvas!
     static var canvasSize: CGSize = CGSize(width: 10_000, height: 10_000)
     var state: WindowState
     
     var didScrollToOffset = false
     var cancellables = Set<AnyCancellable>()
     
+    // Workaround to get approximate selection
     var selectionGestureRecognizer: UIPanGestureRecognizer?
     var selectMinX: CGFloat?
     var selectMaxX: CGFloat?
@@ -34,6 +36,8 @@ class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegat
                       width: abs(selectMaxX - selectMinX), height: abs(selectMaxY - selectMinY))
     }
     
+    var imageRenderView: ImageRenderView?
+    
     let canvasView: PKCanvasView = {
         let canvas = PKCanvasView()
         canvas.translatesAutoresizingMaskIntoConstraints = false
@@ -48,6 +52,10 @@ class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegat
         return canvas
     }()
     
+    var strokes: [PKStroke] {
+        self.canvasView.drawing.strokes
+    }
+    
     init(state: WindowState) {
         self.state = state
         super.init(nibName: nil, bundle: nil)
@@ -57,18 +65,28 @@ class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegat
             guard let self = self else { return }
             switch tool {
             case .pen:
+                self.imageRenderView?.isUserInteractionEnabled = false
+                self.canvasView.isUserInteractionEnabled = true
                 self.canvasView.drawingGestureRecognizer.isEnabled = true
                 self.canvasView.tool = PKInkingTool(.pen, color: state.currentColor.pencilKitColor)
             case .placePhoto:
+                self.imageRenderView?.isUserInteractionEnabled = true
+                self.canvasView.isUserInteractionEnabled = false
                 self.canvasView.drawingGestureRecognizer.isEnabled = false
                 self.canvasView.tool = PKInkingTool(.pen, color: state.currentColor.pencilKitColor)
             case .remove:
+                self.imageRenderView?.isUserInteractionEnabled = false
+                self.canvasView.isUserInteractionEnabled = true
                 self.canvasView.drawingGestureRecognizer.isEnabled = true
                 self.canvasView.tool = PKEraserTool(.vector)
             case .selection:
+                self.imageRenderView?.isUserInteractionEnabled = false
+                self.canvasView.isUserInteractionEnabled = true
                 self.canvasView.drawingGestureRecognizer.isEnabled = true
                 self.canvasView.tool = PKLassoTool()
             case .touch:
+                self.imageRenderView?.isUserInteractionEnabled = false
+                self.canvasView.isUserInteractionEnabled = true
                 self.canvasView.tool = PKInkingTool(.pen, color: state.currentColor.pencilKitColor)
                 self.canvasView.drawingGestureRecognizer.isEnabled = false
             }
@@ -95,7 +113,7 @@ class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegat
     override func viewDidLoad() {
         super.viewDidLoad()
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.handleTap(_:)))
-        
+        tapGesture.delegate = self
         self.view.addSubview(canvasView)
         
         let constraints = [
@@ -105,9 +123,23 @@ class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegat
             canvasView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
         ]
         NSLayoutConstraint.activate(constraints)
-        
-        
         canvasView.addGestureRecognizer(tapGesture)
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.handlePan(_:)))
+        panGesture.delegate = self
+        self.view.addGestureRecognizer(panGesture)
+        
+        let imageRenderView = ImageRenderView(state: state, canvas: canvasView, frame: self.view.bounds)
+        imageRenderView.isUserInteractionEnabled = false
+        self.imageRenderView = imageRenderView
+        imageRenderView.translatesAutoresizingMaskIntoConstraints = false
+        let imageViewConstraints = [
+            imageRenderView.topAnchor.constraint(equalTo: self.view.topAnchor),
+            imageRenderView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            imageRenderView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            imageRenderView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
+        ]
+        self.view.addSubview(imageRenderView)
+        NSLayoutConstraint.activate(imageViewConstraints)
     }
     
     override func viewDidLayoutSubviews() {
@@ -125,6 +157,48 @@ class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegat
     }
     
     @objc
+    func handlePan(_ sender: UIPanGestureRecognizer) -> Void {
+        guard state.currentTool == .selection else {
+            self.selectionOver()
+            return
+        }
+        
+        let point = sender.location(in: self.canvasView)
+        
+        switch sender.state {
+        case .began:
+            self.updateSelectRect(point)
+        case .changed:
+            self.updateSelectRect(point)
+        case .cancelled:
+            self.finishSelection()
+        case .ended:
+            self.finishSelection()
+        default:
+            break
+        }
+        
+        
+    }
+    
+    private func updateSelectRect(_ translatedPoint: CGPoint) {
+        guard let selectMinX = selectMinX,
+              let selectMaxX = selectMaxX,
+              let selectMinY = selectMinY,
+              let selectMaxY = selectMaxY else {
+            selectMinX = translatedPoint.x
+            selectMaxX = translatedPoint.x
+            selectMinY = translatedPoint.y
+            selectMaxY = translatedPoint.y
+            return
+        }
+        self.selectMinX = min(selectMinX, translatedPoint.x)
+        self.selectMaxX = max(selectMaxX, translatedPoint.x)
+        self.selectMinY = min(selectMinY, translatedPoint.y)
+        self.selectMaxY = max(selectMaxY, translatedPoint.y)
+    }
+    
+    @objc
     func handleTap(_ sender: UITapGestureRecognizer) -> Void {
         if sender.state == .ended {
             withAnimation{ self.state.isShowingPenColorPicker = false }
@@ -134,78 +208,85 @@ class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegat
     
     /// Find where the center of the screen is in canvas space
     func getCenterScreenCanvasPosition() async -> CGPoint {
-        let screen = await MainActor.run { () -> CGRect in
-            return self.view.bounds
-        }
-        let canvas = await MainActor.run { () -> CGRect in
-            return self.canvasView.bounds ?? CGRect.zero
-        }
-        let centerScreen = CGPoint(x: canvas.width / 2, y: screen.height / 2)
-        //guard let transform = self.canvasView?.canvasTransform else { return CGPoint(x: 0, y: 0)}
-        //return centerScreen.applying(transform.inverted())
-        return CGPoint(x: 0, y: 0)
+        let contentOffset = self.canvasView.contentOffset
+        return CGPoint(x: contentOffset.x + (self.view.bounds.width / 2),
+                       y: contentOffset.y + (self.view.bounds.height / 2))
     }
     
     
-    func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
+    // Update selection
+    private func finishSelection() {
         if state.currentTool == .selection {
             if let selectRect = self.selectRect {
-                
+                var selection = Set<Int>()
+                for (index, path) in self.canvasView.drawing.strokes.enumerated() {
+                    if selectRect.intersects(path.renderBounds) {
+                        selection.insert(index)
+                    }
+                }
+                if !selection.isEmpty {
+                    withAnimation{ self.state.selection = selection }
+                }
+                self.selectionOver()
             }
         }
     }
+    
+    private func selectionOver() {
+        self.selectMinX = nil
+        self.selectMaxX = nil
+        self.selectMinY = nil
+        self.selectMaxY = nil
+    }
+    
+    func addStrokes(_ strokes: [PKStroke]) {
+        self.canvasView.drawing.strokes.append(contentsOf: strokes)
+    }
+    
+    func updateStrokes(_ strokes: [(Int, PKStroke)]) {
+        var indexToStroke = [Int : PKStroke]()
+        for (index, stroke) in strokes {
+            indexToStroke[index] = stroke
+        }
+        
+        var newStrokes = self.canvasView.drawing.strokes
+        for index in newStrokes.indices {
+            if let stroke = indexToStroke[index] {
+                newStrokes[index] = stroke
+            }
+        }
+        self.canvasView.drawing.strokes = newStrokes
+        
+    }
+    
+    func removeStrokes(_ strokes: Set<Int>) {
+        self.canvasView.drawing.strokes = self.canvasView.drawing.strokes.enumerated().filter { index, stroke in
+            !strokes.contains(index)
+        }.map { _, stroke in
+            return stroke
+        }
+    }
+    
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        true
+    }
+    
 }
 
-/*
-class RenderView: UIView, UIGestureRecognizerDelegate {
+class ImageRenderView: UIView, UIGestureRecognizerDelegate {
     private var state: WindowState
-    
-    // Move canvas
-    var canvasTransform: CGAffineTransform = .identity
-    
-    private var canvasTranslation: CGAffineTransform = .identity
-    
-    // Move selected paths
-    private var selectTranslateStart: CGPoint?
-    private var selectTranslateEnd: CGPoint?
-    
-    private var selectTranslation: CGAffineTransform? {
-        guard let translateStart = selectTranslateStart, let translateEnd = selectTranslateEnd else {
-            return nil
-        }
-        return CGAffineTransform.identity.translatedBy(x: translateEnd.x - translateStart.x, y: translateEnd.y - translateStart.y)
-    }
-    
-    // Path that is currently being drawn
-    private var currentPath: (dataPoints: [CGPoint], path: PhotoDrawPath)? = nil
-    
-    private var removePoint: CGPoint? = nil
-    private var removePathPoints: [CGPoint]? = nil
-    private var pathsToBeDeleted = Set<UUID>()
-    
-    private var cancellables = Set<AnyCancellable>()
-    
-    // Create a path selection
-    private var selectStart: CGPoint?
-    private var selectEnd: CGPoint?
-    private var selectRect: CGRect? {
-        guard let selectStart = selectStart, let selectEnd = selectEnd else {
-            return nil
-        }
-        return CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
-                      width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
-    }
-    
     // Place photo image resizing
     private var imageScale: CGAffineTransform = .identity
-    
     private var imageTranslation: CGAffineTransform = .identity
     
     var pinchGesture: UIPinchGestureRecognizer?
     var panGesture: UIPanGestureRecognizer?
+    private var cancellables = Set<AnyCancellable>()
+    private var canvasView: PKCanvasView
     
-    init(state: WindowState, frame: CGRect) {
+    init(state: WindowState, canvas: PKCanvasView, frame: CGRect) {
         self.state = state
+        self.canvasView = canvas
         super.init(frame: frame)
         self.backgroundColor = .clear
         
@@ -213,9 +294,9 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         // to trigger the pan gesture to allow the tools to be used
         let toolChange = state.$currentTool.sink(receiveValue: { [weak self] tool in
             if tool == .touch || tool == .placePhoto {
-                self?.panGesture?.minimumNumberOfTouches = 1
+                self?.panGesture?.isEnabled = true
             } else {
-                self?.panGesture?.minimumNumberOfTouches = 2
+                self?.panGesture?.isEnabled = false
             }
         })
         
@@ -243,10 +324,6 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         fatalError("init(coder:) has not been implemented")
     }
     
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        true
-    }
-    
     @objc
     func handlePinch(_ sender: UIPinchGestureRecognizer) -> Void {
         // Scale the image that is being converted
@@ -260,27 +337,25 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             }
         }
         
+        let applyScale = {
+            switch self.state.currentTool {
+            case .placePhoto:
+                self.imageScale = .identity
+                self.state.imageConversion?.applyScale(transform: transform)
+            default:
+                break
+            }
+        }
+        
         switch sender.state {
         case .began:
             updateScale()
         case .changed:
             updateScale()
         case .cancelled:
-            switch self.state.currentTool {
-            case .placePhoto:
-                self.imageScale = .identity
-                self.state.imageConversion?.applyScale(transform: transform)
-            default:
-                break
-            }
+            applyScale()
         case .ended:
-            switch self.state.currentTool {
-            case .placePhoto:
-                self.imageScale = .identity
-                self.state.imageConversion?.applyScale(transform: transform)
-            default:
-                break
-            }
+            applyScale()
         default:
             break
         }
@@ -297,8 +372,13 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             let currentTool = self.state.currentTool
             if currentTool == .placePhoto {
                 self.imageTranslation = translation
-            } else {
-                self.canvasTranslation = translation
+            }
+        }
+        
+        let applyPan = {
+            let currentTool = self.state.currentTool
+            if currentTool == .placePhoto {
+                self.finishPhotoTranslate(translation)
             }
         }
         
@@ -308,303 +388,17 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         case .changed:
             updatePan()
         case .cancelled:
-            let currentTool = self.state.currentTool
-            if currentTool == .placePhoto {
-                self.finishPhotoTranslate(translation)
-            } else {
-                self.finishCanvasTranslate(translation)
-            }
+            applyPan()
         case .ended:
-            let currentTool = self.state.currentTool
-            if currentTool == .placePhoto {
-                self.finishPhotoTranslate(translation)
-            } else {
-                self.finishCanvasTranslate(translation)
-            }
+            applyPan()
         default:
             break
         }
         self.setNeedsDisplay()
     }
-    
-    private func translatedPoint(_ point: CGPoint) -> CGPoint {
-        let finalTransform = canvasTransform.concatenating(canvasTranslation)
-        return point.applying(finalTransform.inverted())
-    }
-    
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let touch = touches.first, event?.allTouches?.count == 1 else { return }
-        let currentPoint = translatedPoint(touch.location(in: self))
-        switch self.state.currentTool {
-        case .pen:
-            self.finishPath()
-            // Don't start a new path if there are popovers
-            guard !state.isShowingPopover else { return }
-            // Start a new path
-            let path = PhotoDrawPath(path: Path(components: []), semanticColor: state.currentColor)
-            state.updatePaths(paths: [path])
-            currentPath = ([currentPoint], path)
-        case .selection:
-            if state.hasSelection {
-                self.selectTranslateStart = currentPoint
-            } else {
-                self.selectStart = currentPoint
-            }
-        case .remove:
-            self.removePoint = currentPoint
-            self.removePathPoints = [currentPoint]
-        default:
-            break
-        }
-    }
-    
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let touch = touches.first, event?.allTouches?.count == 1 else { return }
-        let currentPoint = translatedPoint(touch.location(in: self))
-        switch self.state.currentTool {
-        case .pen:
-            guard var currentPath = currentPath else {
-                return
-            }
-            currentPath.dataPoints.append(currentPoint)
-            // Update bezier path to fit new data
-            let newPath = CreatePath.pathFromPoints(currentPath.dataPoints)
-            currentPath.path.updatePath(newPath: newPath)
-            self.currentPath = (currentPath.dataPoints, currentPath.path)
-            self.state.updatePaths(paths: [currentPath.path])
-            // Find what area of the screen is updating
-            let updateRect = newPath.boundingBox.cgRect
-            let transformedRect = updateRect.applying(self.canvasTransform)
-            let scaledRect = CGRect(x: transformedRect.minX - 2, y: transformedRect.minY - 2, width: transformedRect.width + 4, height: transformedRect.height + 4)
-            
-            self.setNeedsDisplay(scaledRect)
-        case .selection:
-            // Find what area of the screen is updating
-            var updateSelectRect: CGRect?
-            if let selectStart = selectStart, let selectEnd = selectEnd {
-                updateSelectRect = CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
-                                          width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
-            }
-            
-            let previousSelectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
-                guard let box = boundingBox else {
-                    boundingBox = path.boundingBox()
-                    return
-                }
-                let pathBox = path.boundingBox()
-                boundingBox = pathBox.union(box)
-            })
-            
-            if let previousSelectedPathBox = previousSelectedPathBox {
-                updateSelectRect = updateSelectRect?.union(previousSelectedPathBox) ?? previousSelectedPathBox
-            }
-            
-            if state.hasSelection {
-                self.selectTranslateEnd = currentPoint
-                let selection = state.selectedPaths
-                guard let translation = selectTranslation else { return }
-                // Update the translation for the selection
-                var updatedPaths = [PhotoDrawPath]()
-                for path in selection {
-                    var newPath = path
-                    newPath.transform(translation, commitTransform: false)
-                    updatedPaths.append(newPath)
-                }
-                self.state.updatePaths(paths: updatedPaths)
-            } else {
-                self.selectEnd = currentPoint
-            }
-            
-            let selectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
-                guard let box = boundingBox else {
-                    boundingBox = path.boundingBox()
-                    return
-                }
-                let pathBox = path.boundingBox()
-                boundingBox = pathBox.union(box)
-            })
-            
-            if let selectedPathBox = selectedPathBox {
-                updateSelectRect = updateSelectRect?.union(selectedPathBox) ?? selectedPathBox
-            }
-            if let selectRect = selectRect {
-                updateSelectRect = updateSelectRect?.union(selectRect) ?? selectRect
-            }
-            
-            if let updateRect = updateSelectRect {
-                let transformedRect = updateRect.applying(self.canvasTransform)
-                let scaledRect = CGRect(x: transformedRect.minX - 20, y: transformedRect.minY - 20, width: transformedRect.width + 40, height: transformedRect.height + 40)
-                self.setNeedsDisplay(scaledRect)
-            }
-        case .remove:
-            var previousPointRect: CGRect?
-            if let removePoint = removePoint {
-                previousPointRect = CGRect(x: removePoint.x - 5, y: removePoint.y - 5, width: 10, height: 10)
-            }
-            self.removePoint = currentPoint
-            guard var removePathPoints = removePathPoints else { return }
-            removePathPoints.append(currentPoint)
-            let removePath = CreatePath.pathFromPoints(removePathPoints)
-            let removeRect = CGRect(x: currentPoint.x - 5, y: currentPoint.y - 5, width: 10, height: 10)
-            
-            // Find what area of the screen is updating
-            var updateRect = previousPointRect ?? removeRect
-            
-            for path in self.state.paths where path.boundingBox().intersects(removeRect) && removePath.intersects(path.path) {
-                pathsToBeDeleted.insert(path.id)
-            }
-            
-            let deletedPathsBox = self.state.pathsForIdentifiers(pathsToBeDeleted).reduce(into: BoundingBox?.none, { boundingBox, path in
-                guard let box = boundingBox else {
-                    boundingBox = path.path.boundingBox
-                    return
-                }
-                var pathBox = path.path.boundingBox
-                pathBox.union(box)
-                boundingBox = pathBox
-            })
-            if let deletedPathsBox = deletedPathsBox {
-                updateRect = updateRect.union(deletedPathsBox.cgRect)
-            }
-            let transformedRect = updateRect.applying(self.canvasTransform)
-            let scaledRect = CGRect(x: transformedRect.minX - 5, y: transformedRect.minY - 5, width: transformedRect.width + 10, height: transformedRect.height + 10)
-            self.setNeedsDisplay(scaledRect)
-        default:
-            break
-        }
-    }
-    
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        self.handleTouchStop(touches)
-    }
-    
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        self.handleTouchStop(touches)
-    }
-    
-    private func handleTouchStop(_ touches: Set<UITouch>) {
-        guard let touch = touches.first else { return }
-        let currentPoint = translatedPoint(touch.location(in: self))
-        switch self.state.currentTool {
-        case .pen:
-            guard let currentPath = currentPath else { return }
-            let updateRect = currentPath.path.boundingBox()
-            let transformedRect = updateRect.applying(self.canvasTransform)
-            let scaledRect = CGRect(x: transformedRect.minX - 2, y: transformedRect.minY - 2, width: transformedRect.width + 4, height: transformedRect.height + 4)
-            self.finishPath()
-            self.setNeedsDisplay(scaledRect)
-        case .selection:
-            // Find what area of the screen is updating
-            var updateSelectRect: CGRect?
-            if let selectStart = selectStart, let selectEnd = selectEnd {
-                updateSelectRect = CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
-                                          width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
-            }
-            
-            let previousSelectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
-                guard let box = boundingBox else {
-                    boundingBox = path.boundingBox()
-                    return
-                }
-                let pathBox = path.boundingBox()
-                boundingBox = pathBox.union(box)
-            })
-            
-            if let previousSelectedPathBox = previousSelectedPathBox {
-                updateSelectRect = updateSelectRect?.union(previousSelectedPathBox) ?? previousSelectedPathBox
-            }
-            
-            if state.hasSelection {
-                self.selectTranslateEnd = currentPoint
-                let selection = state.selectedPaths
-                guard let translation = selectTranslation else { return }
-                // Update the translation for the selection
-                var updatedPaths = [PhotoDrawPath]()
-                for path in selection {
-                    var newPath = path
-                    newPath.transform(translation, commitTransform: true)
-                    updatedPaths.append(newPath)
-                }
-                self.state.updatePaths(paths: updatedPaths)
-                self.selectTranslateStart = nil
-                self.selectTranslateEnd = nil
-            } else {
-                self.selectEnd = currentPoint
-                self.finishSelection()
-            }
-            
-            let selectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
-                guard let box = boundingBox else {
-                    boundingBox = path.boundingBox()
-                    return
-                }
-                let pathBox = path.boundingBox()
-                boundingBox = pathBox.union(box)
-            })
-            
-            if let selectedPathBox = selectedPathBox {
-                updateSelectRect = updateSelectRect?.union(selectedPathBox) ?? selectedPathBox
-            }
-            if let selectRect = selectRect {
-                updateSelectRect = updateSelectRect?.union(selectRect) ?? selectRect
-            }
-            
-            if let updateRect = updateSelectRect {
-                let transformedRect = updateRect.applying(self.canvasTransform)
-                let scaledRect = CGRect(x: transformedRect.minX - 20, y: transformedRect.minY - 20, width: transformedRect.width + 40, height: transformedRect.height + 40)
-                self.setNeedsDisplay(scaledRect)
-            }
-        case .remove:
-            // Find what area of the screen is updating
-            var updateRect = CGRect(x: currentPoint.x - 5, y: currentPoint.y - 5, width: 10, height: 10)
-            let deletedPathsBox = self.state.pathsForIdentifiers(pathsToBeDeleted).reduce(into: BoundingBox?.none, { boundingBox, path in
-                guard let box = boundingBox else {
-                    boundingBox = path.path.boundingBox
-                    return
-                }
-                var pathBox = path.path.boundingBox
-                pathBox.union(box)
-                boundingBox = pathBox
-            })
-            if let deletedPathsBox = deletedPathsBox {
-                updateRect = updateRect.union(deletedPathsBox.cgRect)
-            }
-            let transformedRect = updateRect.applying(self.canvasTransform)
-            let scaledRect = CGRect(x: transformedRect.minX - 5, y: transformedRect.minY - 5, width: transformedRect.width + 10, height: transformedRect.height + 10)
-            self.finishRemove()
-            self.setNeedsDisplay(scaledRect)
-        default:
-            break
-        }
-    }
-    
-    private func finishPath() {
-        self.currentPath = nil
-    }
-    
-    private func finishSelection() {
-        if let selectRect = selectRect {
-            var selection = Set<UUID>()
-            for path in self.state.paths where path.boundingBox().intersects(selectRect) && path.path.intersectsOrContainedBy(rect: selectRect) {
-                selection.insert(path.id)
-            }
-            if selection.count >= 1 {
-                self.state.selection = selection
-            }
-        }
-        self.selectStart = nil
-        self.selectEnd = nil
-    }
-    
-    private func finishRemove() {
-        self.state.removePaths(pathsToBeDeleted)
-        self.removePoint = nil
-        self.removePathPoints = nil
-    }
-    
-    private func finishCanvasTranslate(_ translation: CGAffineTransform) {
-        self.canvasTransform = self.canvasTransform.concatenating(translation)
-        self.canvasTranslation = .identity
+        
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        true
     }
     
     private func finishPhotoTranslate(_ translation: CGAffineTransform) {
@@ -614,114 +408,29 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
     
     override func draw(_ rect: CGRect) {
         // Convert screen rect to canvas space
-        let transformedRect = rect.applying(canvasTransform.inverted()).applying(canvasTranslation.inverted())
-        let context = UIGraphicsGetCurrentContext()
-        context?.setLineCap(.round)
-        context?.setShouldAntialias(true)
-        
-        // Apply transformation
-        context?.concatenate(canvasTransform)
-        context?.concatenate(canvasTranslation)
-        
-        // Draw selection
-        if let selectRect = selectRect {
-            context?.setFillColor(AppColors.accent.withAlphaComponent(0.3).cgColor)
-            context?.setStrokeColor(AppColors.accent.cgColor)
-            context?.setLineWidth(2)
-            context?.addRect(selectRect)
-            context?.drawPath(using: .fillStroke)
-            context?.strokePath()
-        }
-        
-        // Draw remove tool
-        if let removePoint = removePoint {
-            context?.setFillColor(UIColor.systemRed.withAlphaComponent(0.3).cgColor)
-            context?.setStrokeColor(UIColor.systemRed.cgColor)
-            context?.setLineWidth(2)
-            
-            let rect = CGRect(x: removePoint.x - 5, y: removePoint.y - 5, width: 10, height: 10)
-            context?.addEllipse(in: rect)
-            context?.drawPath(using: .fillStroke)
-        }
-        
-        
-        // Draw selection around selected paths bounding box
-        let selectionBoundingBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
-            guard let box = boundingBox else {
-                boundingBox = path.boundingBox()
-                return
-            }
-            boundingBox = box.union(path.boundingBox())
-        })
-        
-        if let selectionBoundingBox = selectionBoundingBox {
-            let largerBox = CGRect(x: selectionBoundingBox.minX - 10, y: selectionBoundingBox.minY - 10, width: selectionBoundingBox.width + 20, height: selectionBoundingBox.height + 20)
-            let path = UIBezierPath(roundedRect: largerBox, cornerRadius: 5)
-            context?.setFillColor(UIColor.clear.cgColor)
-            context?.setStrokeColor(AppColors.accent.withAlphaComponent(0.3).cgColor)
-            context?.setLineWidth(2)
-            context?.addPath(path.cgPath)
-            context?.drawPath(using: .stroke)
-            context?.strokePath()
-        }
-        
-        // Draw all bezier paths
-        for path in state.paths where path.boundingBox().intersects(transformedRect) {
-            
-            // Paths that have been touched by the remove tool should have lower opacity
-            let color = pathsToBeDeleted.contains(path.id) ? path.color.color.withAlphaComponent(0.3).cgColor : path.color.color.cgColor
-            
-            context?.setFillColor(color)
-            context?.setStrokeColor(color)
-            context?.setLineWidth(2)
-            // Apply in-progress transform
-            let pathTransform = path.transform
-            context?.concatenate(pathTransform)
-            context?.addPath(path.path.cgPath)
-            context?.drawPath(using: .fillStroke)
-            context?.strokePath()
-            
-            // Undo in-progress transform
-            context?.concatenate(pathTransform.inverted())
-            
-        }
+        guard let context = UIGraphicsGetCurrentContext() else { return }
         
         // Draw the image that's being placed
         if let imageConversion = state.imageConversion {
             let size = imageConversion.image.size
+            // Find the correct position in this view's space
             var rect: CGRect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
             rect = rect.applying(imageConversion.scaleTransform)
             rect = rect.applying(imageScale)
             rect = rect.applying(imageConversion.translateTransform)
             rect = rect.applying(imageTranslation)
+            rect = rect.applying(.init(translationX: -canvasView.contentOffset.x, y: -canvasView.contentOffset.y))
             // The image needs to be flipped vertically
-            context?.saveGState()
-            context?.translateBy(x: 0, y: rect.origin.y + rect.height)
-            context?.scaleBy(x: 1, y: -1)
+            context.saveGState()
+            context.translateBy(x: 0, y: rect.origin.y + rect.height)
+            context.scaleBy(x: 1, y: -1)
             if let cgImage = imageConversion.image.cgImage {
-                context?.draw(cgImage, in: CGRect(origin: CGPoint(x: rect.origin.x, y: 0), size: rect.size))
+                context.draw(cgImage, in: CGRect(origin: CGPoint(x: rect.origin.x, y: 0), size: rect.size))
             }
-            context?.restoreGState()
+            context.restoreGState()
         }
         
     }
-    
-}
- */
-
-class AppColors {
-    static var accent: UIColor = {
-        let lightMode = #colorLiteral(red: 0.2, green: 0.6666666667, blue: 0.5960784314, alpha: 1)
-        let darkMode = #colorLiteral(red: 0.5450980392, green: 0.9607843137, blue: 0.8549019608, alpha: 1)
-        let provider: (UITraitCollection) -> UIColor = { traits in
-            if traits.userInterfaceStyle == .dark {
-                return darkMode
-            } else {
-                return lightMode
-            }
-        }
-        return UIColor(dynamicProvider: provider)
-    }()
     
 }
 
