@@ -77,7 +77,7 @@ class WindowState: ObservableObject {
     var imageConversion: ImageConversion? = nil
     // Notify when the image conversion has completed
     var imageCancellable: AnyCancellable? = nil
-
+    
     // Used to know where to place the image
     weak var canvas: Canvas? = nil
     

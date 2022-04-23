@@ -45,7 +45,7 @@ class LibraryPhotoPicker: UIViewController, PHPickerViewControllerDelegate {
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-
+    
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         // dismiss picker
         self.state.photoMode = .none
@@ -59,7 +59,7 @@ class LibraryPhotoPicker: UIViewController, PHPickerViewControllerDelegate {
     }
     
 }
-    
+
 struct LibraryPhotoPickerView: UIViewControllerRepresentable {
     @ObservedObject var windowState: WindowState
     
@@ -71,4 +71,4 @@ struct LibraryPhotoPickerView: UIViewControllerRepresentable {
         
     }
 }
-  
+

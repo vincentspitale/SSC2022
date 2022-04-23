@@ -37,17 +37,17 @@ struct WelcomeView: View {
                 VStack{
                     Spacer()
                     Button(action: { self.buttonAction() }) {
-                            Text(self.buttonMessage())
-                                .font(.headline)
-                                .bold()
-                                .foregroundColor(Color(uiColor: UIColor.systemBackground))
-                                .padding()
-                                .frame(width: 200)
-                                .background(Color.accentColor)
-                                .cornerRadius(15)
-                        }
-                        .padding(.bottom, 40)
-                        .padding(.horizontal)
+                        Text(self.buttonMessage())
+                            .font(.headline)
+                            .bold()
+                            .foregroundColor(Color(uiColor: UIColor.systemBackground))
+                            .padding()
+                            .frame(width: 200)
+                            .background(Color.accentColor)
+                            .cornerRadius(15)
+                    }
+                    .padding(.bottom, 40)
+                    .padding(.horizontal)
                 }
             }
             

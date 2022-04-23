@@ -8,15 +8,15 @@ float luminance(float3 rgb) {
 }
 
 kernel void correlation_filter(texture2d<float, access::read> inTexture [[texture(0)]],
-                       texture2d<float, access:: write> outTexture [[texture(1)]],
-                            constant float& size [[ buffer(0) ]],
-                       uint2 position [[thread_position_in_grid]]) {
+                               texture2d<float, access:: write> outTexture [[texture(1)]],
+                               constant float& size [[ buffer(0) ]],
+                               uint2 position [[thread_position_in_grid]]) {
     
     const auto textureSize = ushort2(outTexture.get_width(), outTexture.get_height());
     
     if (!deviceSupportsNonuniformThreadgroups) {
         if (position.x >= textureSize.x || position.y >= textureSize.y) {
-               return;
+            return;
         }
     }
     
@@ -78,7 +78,7 @@ kernel void correlation_filter(texture2d<float, access::read> inTexture [[textur
     
     // Calculate Pearson's correlation coefficient
     float correlation = numeratorSum / sqrt(denominatorSumSample * denominatorSumGaussian);
-
+    
     float4 color(correlation, correlation, correlation, 1);
     outTexture.write(color, position);
 }
@@ -92,7 +92,7 @@ kernel void combine_confidence(texture2d<float, access::read> inTexture [[textur
     
     if (!deviceSupportsNonuniformThreadgroups) {
         if (position.x >= textureSize.x || position.y >= textureSize.y) {
-               return;
+            return;
         }
     }
     
@@ -112,14 +112,14 @@ kernel void combine_confidence(texture2d<float, access::read> inTexture [[textur
 
 
 kernel void threshold_filter(texture2d<float, access::read> inTexture [[texture(0)]],
-                       texture2d<float, access:: write> outTexture [[texture(1)]],
-                       uint2 position [[thread_position_in_grid]]) {
+                             texture2d<float, access:: write> outTexture [[texture(1)]],
+                             uint2 position [[thread_position_in_grid]]) {
     
     const auto textureSize = ushort2(outTexture.get_width(), outTexture.get_height());
     
     if (!deviceSupportsNonuniformThreadgroups) {
         if (position.x >= textureSize.x || position.y >= textureSize.y) {
-               return;
+            return;
         }
     }
     
@@ -135,16 +135,16 @@ kernel void threshold_filter(texture2d<float, access::read> inTexture [[texture(
 }
 
 kernel void differs_from_average_brightness(texture2d<float, access::read> inTexture [[texture(0)]],
-                                         texture2d<float, access::read> inTextureTwo [[texture(1)]],
-                                         texture2d<float, access:: write> outTexture [[texture(2)]],
-                                         constant float& averageBrightness [[ buffer(0) ]],
-                                         uint2 position [[thread_position_in_grid]]) {
+                                            texture2d<float, access::read> inTextureTwo [[texture(1)]],
+                                            texture2d<float, access:: write> outTexture [[texture(2)]],
+                                            constant float& averageBrightness [[ buffer(0) ]],
+                                            uint2 position [[thread_position_in_grid]]) {
     
     const auto textureSize = ushort2(outTexture.get_width(), outTexture.get_height());
     
     if (!deviceSupportsNonuniformThreadgroups) {
         if (position.x >= textureSize.x || position.y >= textureSize.y) {
-               return;
+            return;
         }
     }
     
@@ -180,16 +180,16 @@ kernel void differs_from_average_brightness(texture2d<float, access::read> inTex
 
 
 kernel void add_missing_pixels(texture2d<float, access::read> inTexture [[texture(0)]],
-                                         texture2d<float, access::read> inTextureTwo [[texture(1)]],
-                                         texture2d<float, access:: write> outTexture [[texture(2)]],
-                                         constant float& averageBrightness [[ buffer(0) ]],
-                                         uint2 position [[thread_position_in_grid]]) {
+                               texture2d<float, access::read> inTextureTwo [[texture(1)]],
+                               texture2d<float, access:: write> outTexture [[texture(2)]],
+                               constant float& averageBrightness [[ buffer(0) ]],
+                               uint2 position [[thread_position_in_grid]]) {
     
     const auto textureSize = ushort2(outTexture.get_width(), outTexture.get_height());
     
     if (!deviceSupportsNonuniformThreadgroups) {
         if (position.x >= textureSize.x || position.y >= textureSize.y) {
-               return;
+            return;
         }
     }
     

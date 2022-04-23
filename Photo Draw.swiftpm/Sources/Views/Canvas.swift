@@ -50,9 +50,9 @@ class Canvas: UIViewController {
         if sender.state == .ended {
             withAnimation{ self.state.isShowingPenColorPicker = false }
             withAnimation{ state.selection = nil }
-        }   
+        }
     }
-
+    
     /// Find where the center of the screen is in canvas space
     func getCenterScreenCanvasPosition() async -> CGPoint {
         let screen = await MainActor.run { () -> CGRect in
@@ -118,7 +118,7 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
         self.state = state
         super.init(frame: frame)
         self.backgroundColor = .clear
-    
+        
         // If the current tool changes, update the number of touches required
         // to trigger the pan gesture to allow the tools to be used
         let toolChange = state.$currentTool.sink(receiveValue: { [weak self] tool in
@@ -292,8 +292,8 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             // Find what area of the screen is updating
             var updateSelectRect: CGRect?
             if let selectStart = selectStart, let selectEnd = selectEnd {
-            updateSelectRect = CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
-                          width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
+                updateSelectRect = CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
+                                          width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
             }
             
             let previousSelectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in
@@ -407,8 +407,8 @@ class RenderView: UIView, UIGestureRecognizerDelegate {
             // Find what area of the screen is updating
             var updateSelectRect: CGRect?
             if let selectStart = selectStart, let selectEnd = selectEnd {
-            updateSelectRect = CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
-                          width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
+                updateSelectRect = CGRect(x: min(selectStart.x, selectEnd.x), y: min(selectStart.y, selectEnd.y),
+                                          width: abs(selectStart.x - selectEnd.x), height: abs(selectStart.y - selectEnd.y))
             }
             
             let previousSelectedPathBox = state.selectedPaths.reduce(into: CGRect?.none, { boundingBox, path in

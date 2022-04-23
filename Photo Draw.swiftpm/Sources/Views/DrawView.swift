@@ -39,6 +39,7 @@ struct DrawView: View {
         ZStack{
             LibraryPhotoPickerView(windowState: windowState)
             CameraScanView(windowState: windowState)
+            ExamplePhotosView(windowState: windowState)
             Rectangle()
                 .foregroundColor(Color(uiColor: UIColor.systemGray6))
                 .transition(.opacity)
@@ -57,35 +58,35 @@ struct DrawView: View {
                         .padding()
                 }
                 if windowState.currentTool != .placePhoto {
-                ZStack {
-                    RoundedRectangle(cornerRadius: .greatestFiniteMagnitude, style: .continuous)
-                        .foregroundColor(Color(uiColor: UIColor.systemGray5))
-                    HStack {
-                        Spacer()
-                        if windowState.currentTool != .placePhoto {
-                            if !hasSelection {
-                                self.controls()
+                    ZStack {
+                        RoundedRectangle(cornerRadius: .greatestFiniteMagnitude, style: .continuous)
+                            .foregroundColor(Color(uiColor: UIColor.systemGray5))
+                        HStack {
+                            Spacer()
+                            if windowState.currentTool != .placePhoto {
+                                if !hasSelection {
+                                    self.controls()
+                                }
+                                Button(action: {selectionAction()}) {
+                                    Image(systemName: "lasso")
+                                        .font(.largeTitle)
+                                        .foregroundColor(windowState.currentTool == .selection ? .primary : .secondary)
+                                        .frame(width: 50)
+                                }
+                                .accessibilityLabel("Select")
+                                .accessibility(addTraits: self.windowState.currentTool == .selection ? .isSelected : [])
+                                if hasSelection {
+                                    Spacer()
+                                    self.selectionControls()
+                                }
                             }
-                            Button(action: {selectionAction()}) {
-                                Image(systemName: "lasso")
-                                    .font(.largeTitle)
-                                    .foregroundColor(windowState.currentTool == .selection ? .primary : .secondary)
-                                    .frame(width: 50)
-                            }
-                            .accessibilityLabel("Select")
-                            .accessibility(addTraits: self.windowState.currentTool == .selection ? .isSelected : [])
-                            if hasSelection {
-                                Spacer()
-                                self.selectionControls()
-                            }
+                            Spacer()
                         }
-                        Spacer()
                     }
-                }
-                .frame(minWidth: nil, idealWidth: toolWidth, maxWidth: toolWidth, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
-                .transition(.opacity.combined(with: .move(edge: self.horizontalSizeClass == .compact ? .bottom : .top)))
-                .zIndex(1)
-                .padding(.horizontal)
+                    .frame(minWidth: nil, idealWidth: toolWidth, maxWidth: toolWidth, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
+                    .transition(.opacity.combined(with: .move(edge: self.horizontalSizeClass == .compact ? .bottom : .top)))
+                    .zIndex(1)
+                    .padding(.horizontal)
                 }
                 if let imageConversion = windowState.imageConversion {
                     ZStack {
@@ -108,13 +109,13 @@ struct DrawView: View {
                                 .padding()
                                 .background(
                                     Rectangle().fill(Color(uiColor: UIColor.systemGray6))
-                                            .blur(radius: 10)
-                                    )
+                                        .blur(radius: 10)
+                                )
                         }
                     }
-                .frame(minWidth: nil, idealWidth: toolWidth, maxWidth: toolWidth, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
-                .zIndex(2)
-                .padding(.horizontal)
+                    .frame(minWidth: nil, idealWidth: toolWidth, maxWidth: toolWidth, minHeight: nil, idealHeight: 70, maxHeight: 70, alignment: .center)
+                    .zIndex(2)
+                    .padding(.horizontal)
                 }
                 if horizontalSizeClass != .compact {
                     self.penColorPicker()

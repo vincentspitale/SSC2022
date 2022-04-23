@@ -55,6 +55,7 @@ class CameraScan: UIViewController, VNDocumentCameraViewControllerDelegate {
     }
     
     func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
+        // Convert the first page to digital ink
         if scan.pageCount > 0 {
             let image = scan.imageOfPage(at: 0)
             Task { @MainActor in
