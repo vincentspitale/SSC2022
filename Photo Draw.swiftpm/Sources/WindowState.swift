@@ -175,17 +175,17 @@ enum SemanticColor: CaseIterable, Comparable {
         case .gray:
             return #colorLiteral(red: 0.5568627451, green: 0.5568627451, blue: 0.5764705882, alpha: 1)
         case .red:
-            return #colorLiteral(red: 0.9215686275, green: 0.3058823529, blue: 0.2392156863, alpha: 1)
+            return #colorLiteral(red: 0.9270923734, green: 0.1670316756, blue: 0.03019672818, alpha: 1)
         case .orange:
-            return #colorLiteral(red: 0.9960784314, green: 0.5921568627, blue: 0.2196078431, alpha: 1)
+            return #colorLiteral(red: 0.999529779, green: 0.5594156384, blue: 0, alpha: 1)
         case .yellow:
-            return #colorLiteral(red: 0.968627451, green: 0.8078431373, blue: 0.262745098, alpha: 1)
+            return #colorLiteral(red: 0.9696072936, green: 0.8020537496, blue: 0, alpha: 1)
         case .green:
             return #colorLiteral(red: 0.3882352941, green: 0.7921568627, blue: 0.337254902, alpha: 1)
         case .blue:
-            return #colorLiteral(red: 0.2039215686, green: 0.4705882353, blue: 0.9647058824, alpha: 1)
+            return #colorLiteral(red: 0.03155988827, green: 0.4386033714, blue: 0.9659433961, alpha: 1)
         case .purple:
-            return #colorLiteral(red: 0.6588235294, green: 0.3411764706, blue: 0.8431372549, alpha: 1)
+            return #colorLiteral(red: 0.6174378395, green: 0.2372990549, blue: 0.8458326459, alpha: 1)
         }
     }
     
