@@ -1,6 +1,6 @@
 //
 //  ImagePathConverter.swift
-//  
+//
 //
 //  Created by Vincent Spitale on 4/12/22.
 //
@@ -305,14 +305,14 @@ fileprivate class Connectivity {
     // matrices match the neighbors matrix, that point is an edge pixel of a path.
     //
     // Reading matrix values:
-    // 0 means that there must not be a path pixel there.
+    // -1 means that there must not be a path pixel there.
     // 1 means that there must be a path pixel there.
-    // -1 indicates that it does not matter if there is a path pixel there.
+    // 0 indicates that it does not matter if there is a path pixel there.
     private lazy var _edgeMasks: [simd_float3x3] = {
         let lastHorizontal: simd_float3x3 = {
-            let col0 = simd_float3(0, 0, 0)
-            let col1 = simd_float3(1, 1, 0)
-            let col2 = simd_float3(0, 0, 0)
+            let col0 = simd_float3(-1, -1, -1)
+            let col1 = simd_float3(1, 1, -1)
+            let col2 = simd_float3(-1, -1, -1)
             return simd_float3x3(col0, col1, col2)
         }()
         
@@ -347,65 +347,65 @@ fileprivate class Connectivity {
     // connectivity.
     //
     // Reading matrix values:
-    // 0 means that there must not be a path pixel there.
+    // -1 means that there must not be a path pixel there.
     // 1 means that there must be a path pixel there.
-    // -1 indicates that it does not matter if there is a path pixel there.
+    // 0 indicates that it does not matter if there is a path pixel there.
     private lazy var _hitMissMasks: [simd_float3x3] = {
         var masks = [simd_float3x3]()
         
         let horizontal: simd_float3x3 = {
-            let col0 = simd_float3(0, 0, 0)
-            let col1 = simd_float3(1, 1, 0)
-            let col2 = simd_float3(0, 0, 0)
-            return simd_float3x3(col0, col1, col2)
-        }()
-        
-        let topLeft: simd_float3x3 = {
-            let col0 = simd_float3(1, -1, -1)
-            let col1 = simd_float3(-1, 1, 0)
-            let col2 = simd_float3(-1, 0, 1)
-            return simd_float3x3(col0, col1, col2)
-        }()
-        
-        let topCenter: simd_float3x3 = {
             let col0 = simd_float3(-1, -1, -1)
-            let col1 = simd_float3(1, 1, 0)
-            let col2 = simd_float3(-1, 0, 1)
-            return simd_float3x3(col0, col1, col2)
-        }()
-        
-        let topRight: simd_float3x3 = {
-            let col0 = simd_float3(-1, 0, 1)
-            let col1 = simd_float3(1, 1, 0)
+            let col1 = simd_float3(1, 1, -1)
             let col2 = simd_float3(-1, -1, -1)
             return simd_float3x3(col0, col1, col2)
         }()
         
+        let topLeft: simd_float3x3 = {
+            let col0 = simd_float3(1, 0, 0)
+            let col1 = simd_float3(0, 1, -1)
+            let col2 = simd_float3(0, -1, 1)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        let topCenter: simd_float3x3 = {
+            let col0 = simd_float3(0, 0, 0)
+            let col1 = simd_float3(1, 1, -1)
+            let col2 = simd_float3(0, -1, 1)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
+        let topRight: simd_float3x3 = {
+            let col0 = simd_float3(0, -1, 1)
+            let col1 = simd_float3(1, 1, -1)
+            let col2 = simd_float3(0, 0, 0)
+            return simd_float3x3(col0, col1, col2)
+        }()
+        
         let bottomLeft0: simd_float3x3 = {
-            let col0 = simd_float3(-1, 0, -1)
+            let col0 = simd_float3(0, -1, 0)
             let col1 = simd_float3(1, 1, 1)
-            let col2 = simd_float3(-1, 0, -1)
+            let col2 = simd_float3(0, -1, 0)
             return simd_float3x3(col0, col1, col2)
         }()
         
         let bottomLeft1: simd_float3x3 = {
-            let col0 = simd_float3(-1, 1, -1)
-            let col1 = simd_float3(0, 1, 0)
-            let col2 = simd_float3(-1, 1, -1)
+            let col0 = simd_float3(0, 1, 0)
+            let col1 = simd_float3(-1, 1, -1)
+            let col2 = simd_float3(0, 1, 0)
             return simd_float3x3(col0, col1, col2)
         }()
         
         let bottomMiddle: simd_float3x3 = {
-            let col0 = simd_float3(-1, 0, 1)
-            let col1 = simd_float3(-1, 1, 0)
-            let col2 = simd_float3(-1, 0, 1)
+            let col0 = simd_float3(0, -1, 1)
+            let col1 = simd_float3(0, 1, -1)
+            let col2 = simd_float3(0, -1, 1)
             return simd_float3x3(col0, col1, col2)
         }()
         
         let bottomRight: simd_float3x3 = {
-            let col0 = simd_float3(-1, 1, -1)
+            let col0 = simd_float3(0, 1, 0)
             let col1 = simd_float3(1, 1, 1)
-            let col2 = simd_float3(-1, 1, -1)
+            let col2 = simd_float3(0, 1, 0)
             return simd_float3x3(col0, col1, col2)
         }()
         
@@ -438,26 +438,23 @@ fileprivate class Connectivity {
         let bottomLeft = Point(x: point.x - 1, y: point.y + 1)
         let bottomRight = Point(x: point.x + 1, y: point.y + 1)
         
-        let col0 = [topLeft, left, bottomLeft].map { group.contains($0) }.map { $0 ? Int(1) : Int(0)}
-        let col1 = [up, point, down].map { group.contains($0) }.map { $0 ? Int(1) : Int(0)}
-        let col2 = [topRight, right, bottomRight].map { group.contains($0) }.map { $0 ? Int(1) : Int(0)}
-        let columns = [col0, col1, col2]
+        let col0 = [topLeft, left, bottomLeft].map { group.contains($0) }.map { $0 ? Float(1) : Float(-1)}
+        let simdCol0 = SIMD3<Float>(col0)
+        let col1 = [up, point, down].map { group.contains($0) }.map { $0 ? Float(1) : Float(-1)}
+        let simdCol1 = SIMD3<Float>(col1)
+        let col2 = [topRight, right, bottomRight].map { group.contains($0) }.map { $0 ? Float(1) : Float(-1)}
+        let simdCol2 = SIMD3<Float>(col2)
         
         // Compares a given matrix to the 3x3 grid of pixels surrounding a point
         let isRequired: (simd_float3x3) -> Bool = { matrix in
-            let (hitCol0, hitCol1, hitCol2) = matrix.columns
-            let hitColumns = [hitCol0, hitCol1, hitCol2]
-            for (hit, col) in zip(hitColumns, columns) {
-                let (x, y, z) = (hit.x, hit.y, hit.z)
-                let hitArray = [Int(x), Int(y), Int(z)]
-                for (hitNum, colNum) in zip(hitArray, col) {
-                    guard hitNum >= 0 else { continue }
-                    if hitNum != colNum {
-                        return false
-                    }
-                }
+            let columns = [simdCol0, simdCol1, simdCol2]
+            let multipliedColumns = zip([matrix.columns.0, matrix.columns.1, matrix.columns.2], columns).map { matrixColumn, column in
+                matrixColumn * column
             }
-            return true
+            let squared = [matrix.columns.0, matrix.columns.1, matrix.columns.2].map { matrixColumn in
+                matrixColumn * matrixColumn
+            }
+            return simd_float3x3(multipliedColumns) == simd_float3x3(squared)
         }
         return isRequired
     }

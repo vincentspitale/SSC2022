@@ -16,7 +16,7 @@ class WindowState: ObservableObject {
     @Published var currentColor: SemanticColor = .primary
     @Published var currentTool: CanvasTool = .pen {
         willSet {
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 // No longer in selection mode, remove selection
                 if newValue != CanvasTool.selection {
                     self.selection = nil
@@ -33,7 +33,7 @@ class WindowState: ObservableObject {
     @Published var selection: Set<Int>? = nil {
         // Selection changed, the selection color picker should not be visible
         willSet {
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 withAnimation{ self.isShowingSelectionColorPicker = false }
             }
             
@@ -132,7 +132,7 @@ class WindowState: ObservableObject {
     /// Adds the image conversion paths to the canvas
     func placeImage() {
         guard let imageConversion = imageConversion else { return }
-        let imagePaths = imageConversion.getPaths()
+        let imagePaths = imageConversion.getStrokes()
         self.addStrokes(strokes: imagePaths)
         withAnimation { self.currentTool = .pen }
         self.imageConversion = nil
@@ -167,15 +167,15 @@ enum SemanticColor: CaseIterable, Comparable {
     case blue
     case purple
     
-    // light mode colors
-    private var _color: UIColor {
+    // light mode colors that dark mode colors are generated from
+    private var lightColor: UIColor {
         switch self {
         case .primary:
             return #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
         case .gray:
             return #colorLiteral(red: 0.5568627451, green: 0.5568627451, blue: 0.5764705882, alpha: 1)
         case .red:
-            return #colorLiteral(red: 0.9270923734, green: 0.1670316756, blue: 0.03019672818, alpha: 1)
+            return #colorLiteral(red: 0.9833723903, green: 0.1313590407, blue: 0.1335203946, alpha: 1)
         case .orange:
             return #colorLiteral(red: 0.999529779, green: 0.5594156384, blue: 0, alpha: 1)
         case .yellow:
@@ -190,7 +190,7 @@ enum SemanticColor: CaseIterable, Comparable {
     }
     
     public var color: UIColor {
-        Self.adaptiveInvertedBrightness(color: _color)
+        Self.adaptiveInvertedBrightness(color: lightColor)
     }
     
     /// Color that changes depending on the system theme with an inverted brightness variant of the given color
@@ -233,7 +233,7 @@ enum SemanticColor: CaseIterable, Comparable {
     
     /// The light mode color that PencilKit uses to interpret light and dark mode colors
     public var pencilKitColor: UIColor {
-        self._color
+        self.lightColor
     }
     
     /// Accessibility label for color
@@ -313,7 +313,8 @@ class ImageConversion: ObservableObject {
         }
     }
     
-    func getPaths() -> [PKStroke] {
+    /// Generate strokes from the converted path data
+    func getStrokes() -> [PKStroke] {
         guard let paths = self.paths else { return [] }
         return paths.map { points, color in
             let transformedPoints = points.map { point -> PKStrokePoint in

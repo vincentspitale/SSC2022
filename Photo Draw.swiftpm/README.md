@@ -6,7 +6,7 @@ My app for the 2022 Swift Student Challenge.
 
 ## Why did I make this app?
 
-There's something to be said for the focussed task of writing on pen and paper. You can't get distracted by notifications in a notebook like you can when writing on an iPad. However, the digital writing and drawing experience can be better at times. With digital ink, if you want to move something to make more space, you can simply select and move it. And if you want to change the color, you can pick a new one. 
+There's something to be said for the focussed task of writing on pen and paper. You can't get distracted by notifications in a Muji notebook like you can when writing on an iPad. However, the digital writing and drawing experience can be better at times. With digital ink, if you want to move something to make more space, you can simply select and move it. And if you want to change the color, you can pick a new one. 
 
 For years I wished there was a way to convert my notes on paper to digital. Better yet if I could easily take a photo of the chalkboard in class and have all of the math written there editable in my notes. So I decided to make an app that can do just that!
 

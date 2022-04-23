@@ -273,10 +273,11 @@ class Canvas: UIViewController, PKCanvasViewDelegate, UIGestureRecognizerDelegat
 
 class ImageRenderView: UIView, UIGestureRecognizerDelegate {
     private var state: WindowState
-    // Place photo image resizing
+    // Image resizing
     private var imageScale: CGAffineTransform = .identity
     private var imageTranslation: CGAffineTransform = .identity
     
+    // Move image with gestures
     var pinchGesture: UIPinchGestureRecognizer?
     var panGesture: UIPanGestureRecognizer?
     private var cancellables = Set<AnyCancellable>()
