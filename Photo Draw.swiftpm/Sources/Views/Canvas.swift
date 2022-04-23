@@ -312,6 +312,7 @@ class ImageRenderView: UIView, UIGestureRecognizerDelegate {
         self.addGestureRecognizer(pinch)
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
         pan.delegate = self
+        pan.allowedScrollTypesMask = [.all]
         self.panGesture = pan
         self.addGestureRecognizer(pan)
     }
