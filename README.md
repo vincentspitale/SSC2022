@@ -17,3 +17,15 @@ The image path finding algorithm I implemented uses the process outlined in the 
 **This app was tested with Xcode 13.3 and should be compiled using Xcode rather than Swift Playgrounds 4.**
 
 Test on an iPad for the best experience :)
+
+### Overview of Technologies
+
+My drawing app is comprised mostly of SwiftUI with some UIKit views sprinkled in. The navigation uses SwiftUI that is updated with changes to the view model. The UIKit views enable system integrations like VisionKit's document scanner, PhotosUI's photo picker, and PencilKit's canvas. These views still update in a reactive way by subscribing to changes from Combine publishers so they are always in sync with the model.
+
+PencilKit is the foundation for displaying strokes on the canvas. Since PencilKit now exposes the strokes in a drawing, I am able to programmatically add new vector paths. The heart of my app is the ImagePathConverter that generates the new strokes that are added to the drawing. I create image kernels using MetalKit that execute on the GPU, modifying the image to generate a final image that for any pixel determines if it is or is not part of a stroke. These kernels are written in Metal Shading Language.
+
+I used Swift Concurrency to process image vector conversions in the background without blocking the main thread. By having the work done in a Task, the image can be placed and rendered using Core Graphics as we await its converted strokes. Grand Central Dispatch let me perform parallel loops. These loops sped up generating the paths by allowing them be created across multiple threads simultaneously when the data was independent.
+With the finished product of having images converted to strokes, I'm really proud of what I was able to bring together using Apple's Frameworks.
+
+
+
