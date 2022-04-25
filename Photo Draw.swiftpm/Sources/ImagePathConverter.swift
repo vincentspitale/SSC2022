@@ -73,6 +73,7 @@ class ImagePathConverter {
         return pathColors.flatMap { $0 }
     }
     
+    // Get the pixel data at this point in the original image
     private func pixelAtPoint(_ p: Point) -> Pixel? {
         let imageIndex: Int = (p.y * Int(image.size.width)) + p.x
         guard let pixelData = rgbaPixelData, imageIndex >= 0 && imageIndex < Int(image.size.width * image.size.height) else {
@@ -448,13 +449,16 @@ fileprivate class Connectivity {
         // Compares a given matrix to the 3x3 grid of pixels surrounding a point
         let isRequired: (simd_float3x3) -> Bool = { matrix in
             let columns = [simdCol0, simdCol1, simdCol2]
-            let multipliedColumns = zip([matrix.columns.0, matrix.columns.1, matrix.columns.2], columns).map { matrixColumn, column in
+            let matrixColumns = [matrix.columns.0, matrix.columns.1, matrix.columns.2]
+            let multipliedColumns = zip(matrixColumns, columns).map { matrixColumn, column in
                 matrixColumn * column
             }
-            let squared = [matrix.columns.0, matrix.columns.1, matrix.columns.2].map { matrixColumn in
-                matrixColumn * matrixColumn
+            let absoluteValue = [matrix.columns.0, matrix.columns.1, matrix.columns.2].map { matrixColumn in
+                simd_abs(matrixColumn)
             }
-            return simd_float3x3(multipliedColumns) == simd_float3x3(squared)
+            // If these matrices have the same values at -1, 1 in the mask, their direct
+            // element product should be equal to the absolute value of the mask
+            return simd_float3x3(multipliedColumns) == simd_float3x3(absoluteValue)
         }
         return isRequired
     }

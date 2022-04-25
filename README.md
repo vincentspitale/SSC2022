@@ -16,4 +16,4 @@ The image path finding algorithm I implemented uses the process outlined in the 
 
 **This app was tested with Xcode 13.3 and should be compiled using Xcode rather than Swift Playgrounds 4.**
 
-Please test on an iPad for the best experience
+Test on an iPad for the best experience :)
