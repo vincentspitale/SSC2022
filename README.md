@@ -1,7 +1,7 @@
+# Photo Draw
+
 ![Demo](https://user-images.githubusercontent.com/43227465/165872870-76e0e191-ed2f-44eb-885c-8c9a11336079.gif)
 
-
-# Photo Draw
 
 My app for the 2022 Swift Student Challenge.
 
